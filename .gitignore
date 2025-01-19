@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+.venv
+/experiments/data
