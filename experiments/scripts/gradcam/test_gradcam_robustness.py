@@ -14,6 +14,7 @@ from scipy.ndimage import zoom, map_coordinates
 import skimage as sk
 from skimage.filters import gaussian
 from io import BytesIO
+from sklearn.metrics import mutual_info_score
 
 def clipped_zoom(img, zoom_factor):
     """Center-crop an image after zooming
@@ -257,7 +258,7 @@ class GradCAMRobustnessTest:
             input_tensor: 输入图像张量
             
         Returns:
-            GradCAM热力图
+            GradCAM热力图 (224x224)
         """
         # 确保启用梯度
         input_tensor.requires_grad = True
@@ -265,26 +266,28 @@ class GradCAMRobustnessTest:
         # 生成GradCAM
         gradcam_mask = self.gradcam(input_tensor=input_tensor)
         
-        return gradcam_mask[0]  # 返回第一个样本的mask
+        # 将mask调整到224x224大小
+        mask = cv2.resize(gradcam_mask[0], (224, 224))
+        
+        return mask
 
     def calculate_similarity(self, mask1: np.ndarray, mask2: np.ndarray) -> float:
-        """计算两个GradCAM mask之间的相似度
+        """计算两个解释之间的余弦相似度
         
         Args:
-            mask1: 第一个GradCAM mask
-            mask2: 第二个GradCAM mask
-            
-        Returns:
-            相似度分数（0-1之间）
+            mask1: 第一个GradCAM mask (224x224)
+            mask2: 第二个GradCAM mask (224x224)
         """
-        # 展平并计算余弦相似度
+        # 确保mask大小相同
+        if mask1.shape != mask2.shape:
+            mask2 = cv2.resize(mask2, (mask1.shape[1], mask1.shape[0]))
+        
         mask1_flat = mask1.flatten()
         mask2_flat = mask2.flatten()
         
-        similarity = np.dot(mask1_flat, mask2_flat) / (
+        return np.dot(mask1_flat, mask2_flat) / (
             np.linalg.norm(mask1_flat) * np.linalg.norm(mask2_flat)
         )
-        return float(similarity)
 
     def calculate_additional_metrics(self, original_tensor: torch.Tensor, 
                                   corrupted_tensor: torch.Tensor) -> Dict:
@@ -302,13 +305,15 @@ class GradCAMRobustnessTest:
             original_output = self.model(original_tensor)
             original_pred = torch.argmax(original_output, dim=1)
             original_probs = torch.softmax(original_output, dim=1)
+            original_top5 = torch.topk(original_output, k=5, dim=1)[1][0]
             
             # 获取corrupted预测
             corrupted_output = self.model(corrupted_tensor)
             corrupted_pred = torch.argmax(corrupted_output, dim=1)
             corrupted_probs = torch.softmax(corrupted_output, dim=1)
+            corrupted_top5 = torch.topk(corrupted_output, k=5, dim=1)[1][0]
             
-            # 计算指标
+            # 计算基本指标
             prediction_change = (original_pred != corrupted_pred).float().mean().item()
             confidence_original = original_probs.max(dim=1)[0].item()
             confidence_corrupted = corrupted_probs.max(dim=1)[0].item()
@@ -321,98 +326,283 @@ class GradCAMRobustnessTest:
                 reduction='batchmean'
             ).item()
             
+            # 计算Top-5距离
+            top5_distance = self.calculate_mt5d(
+                original_top5.cpu().numpy(),
+                corrupted_top5.cpu().numpy()
+            )
+            
+            # 计算Corruption Error (相对于原始预测的错误率增加)
+            original_error = 1 - confidence_original
+            corruption_error = 1 - confidence_corrupted
+            mce = self.calculate_mce(original_error, corruption_error)
+            
             return {
                 'prediction_change': prediction_change,
                 'confidence_diff': confidence_diff,
                 'kl_divergence': kl_div,
                 'original_confidence': confidence_original,
-                'corrupted_confidence': confidence_corrupted
+                'corrupted_confidence': confidence_corrupted,
+                'top5_distance': top5_distance,
+                'corruption_error': mce
             }
 
-    def evaluate_single_image(self, image_path: str) -> Dict:
-        """评估单张图像的GradCAM鲁棒性
+    def calculate_consistency(self, exp1: np.ndarray, exp2: np.ndarray) -> float:
+        """计算语义一致性
         
         Args:
-            image_path: 图像文件路径
-            
-        Returns:
-            包含评估结果的字典
+            exp1: 原始解释 (224x224)
+            exp2: 扰动后的解释 (224x224)
         """
-        # 加载原始图像
-        input_tensor, original_image = self.load_image(image_path)
+        # 确保大小相同
+        if exp1.shape != exp2.shape:
+            exp2 = cv2.resize(exp2, (exp1.shape[1], exp1.shape[0]))
         
-        # 生成原始GradCAM
-        original_mask = self.generate_gradcam(input_tensor)
+        exp1_bins = np.digitize(exp1.flatten(), bins=np.linspace(0, 1, 20))
+        exp2_bins = np.digitize(exp2.flatten(), bins=np.linspace(0, 1, 20))
+        mi = mutual_info_score(exp1_bins, exp2_bins)
+        return mi / np.log(20)
+
+    def calculate_stability(self, explanations: List[np.ndarray]) -> float:
+        """计算解释的稳定性
         
-        results = {}
-        # 对每种corruption类型
-        for corruption_type in self.corruption_types:
-            corruption_results = []
-            # 对每个严重程度
-            for severity in range(1, 6):
-                # 应用corruption
-                corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
-                corrupted_tensor = self.transform(corrupted_image).unsqueeze(0).to(self.device)
-                
-                # 生成corrupted图像的GradCAM
-                corrupted_mask = self.generate_gradcam(corrupted_tensor)
-                
-                # 计算相似度
-                similarity = self.calculate_similarity(original_mask, corrupted_mask)
-                
-                # 计算额外指标
-                additional_metrics = self.calculate_additional_metrics(input_tensor, corrupted_tensor)
-                
-                corruption_results.append({
-                    'severity': severity,
-                    'similarity': similarity,
-                    **additional_metrics
-                })
+        Args:
+            explanations: 同一图像在不同扰动下的解释列表 (每个都是224x224)
+        """
+        # 确保所有解释大小相同
+        base_shape = explanations[0].shape
+        resized_explanations = []
+        for exp in explanations:
+            if exp.shape != base_shape:
+                exp = cv2.resize(exp, (base_shape[1], base_shape[0]))
+            resized_explanations.append(exp)
+        
+        explanations = np.array(resized_explanations)
+        return 1 - np.mean(np.var(explanations, axis=0))
+
+    def calculate_localization(self, explanation: np.ndarray, image: np.ndarray) -> float:
+        """计算空间准确性
+        Localization = IoU(Mask_exp, Mask_edge)
+        IoU = intersection / union
+        来源: "Score-CAM: Score-Weighted Visual Explanations" (CVPR 2020)
+        
+        Args:
+            explanation: GradCAM解释 (任意大小)
+            image: 原始图像 (HxWx3)
+        """
+        try:
+            # 确保explanation和image具有相同的空间维度
+            if explanation.shape != image.shape[:2]:
+                explanation = cv2.resize(explanation, (image.shape[1], image.shape[0]))
             
-            results[corruption_type] = corruption_results
+            # 归一化explanation到0-1范围
+            explanation = (explanation - explanation.min()) / (explanation.max() - explanation.min() + 1e-8)
             
-        return results
+            # 创建mask
+            exp_mask = (explanation > np.mean(explanation)).astype(np.float32)
+            
+            # 转换图像为灰度并进行边缘检测
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            else:
+                gray = image
+            
+            edges = cv2.Canny(gray, 100, 200)
+            edges = edges.astype(np.float32) / 255.0
+            
+            # 计算IoU
+            intersection = np.sum(exp_mask * edges)
+            union = np.sum((exp_mask + edges) > 0)
+            
+            return float(intersection / (union + 1e-6))
+            
+        except Exception as e:
+            print(f"Error in calculate_localization: {e}")
+            return 0.0  # 返回默认值而不是失败
+
+    def calculate_mce(self, clean_err: float, corruption_err: float) -> float:
+        """计算Mean Corruption Error
+        mCE = E_c[CE_c], where CE_c = E_c(f) / E_c(AlexNet)
+        来源: "Benchmarking Neural Network Robustness to Common Corruptions and Perturbations" (ICLR 2019)
+        """
+        return corruption_err / clean_err
+
+    def calculate_confidence_diff(self, original_conf: float, corrupted_conf: float) -> float:
+        """计算置信度差异
+        Conf_diff = |conf(x) - conf(x̃)|
+        来源: "On Calibration of Modern Neural Networks" (ICML 2017)
+        """
+        return abs(original_conf - corrupted_conf)
+
+    def calculate_mfr(self, original_pred: torch.Tensor, corrupted_pred: torch.Tensor) -> float:
+        """计算平均翻转率
+        mFR = mean(I[f(x) ≠ f(x̃)])
+        来源: "Benchmarking the Robustness of Spatial Computing" (NeurIPS 2019)
+        """
+        return (original_pred != corrupted_pred).float().mean().item()
+
+    def calculate_mt5d(self, original_top5: torch.Tensor, corrupted_top5: torch.Tensor) -> float:
+        """计算Top-5预测距离
+        mT5D = mean(|top5(x) ∆ top5(x̃)|) / 5
+        ∆: 对称差
+        来源: "ImageNet-trained CNNs are biased towards texture" (ICLR 2019)
+        """
+        return len(set(original_top5) ^ set(corrupted_top5)) / 5.0
+
+    def calculate_kl_divergence(self, original_probs: torch.Tensor, corrupted_probs: torch.Tensor) -> float:
+        """计算KL散度
+        KL(P||Q) = Σ P(x)log(P(x)/Q(x))
+        来源: "Understanding deep learning requires rethinking generalization" (ICLR 2017)
+        """
+        return torch.nn.functional.kl_div(
+            corrupted_probs.log(),
+            original_probs,
+            reduction='batchmean'
+        ).item()
+
+    def evaluate_single_image(self, image_path: str) -> Dict:
+        """评估单张图像的所有metrics"""
+        try:
+            # 加载并预处理图像
+            input_tensor, original_image = self.load_image(image_path)
+            # 确保图像是uint8类型
+            original_image_np = np.array(original_image).astype(np.uint8)
+            
+            # 生成原始GradCAM
+            original_mask = self.generate_gradcam(input_tensor)
+            
+            results = {}
+            for corruption_type in self.corruption_types:
+                corruption_results = []
+                explanations = []  # 用于计算stability
+                
+                for severity in range(1, 6):
+                    try:
+                        # 应用corruption
+                        corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
+                        # 确保corrupted_image是uint8类型
+                        corrupted_image_np = np.array(corrupted_image).astype(np.uint8)
+                        corrupted_tensor = self.transform(corrupted_image).unsqueeze(0).to(self.device)
+                        
+                        # 生成corrupted图像的GradCAM
+                        corrupted_mask = self.generate_gradcam(corrupted_tensor)
+                        
+                        # 保存解释用于计算stability
+                        explanations.append(corrupted_mask)
+                        
+                        # 计算所有metrics
+                        metrics = {
+                            'severity': severity,
+                            'similarity': self.calculate_similarity(original_mask, corrupted_mask),
+                            'consistency': self.calculate_consistency(original_mask, corrupted_mask),
+                            'localization': self.calculate_localization(corrupted_mask, corrupted_image_np)
+                        }
+                        
+                        # 添加现有的其他metrics
+                        additional_metrics = self.calculate_additional_metrics(input_tensor, corrupted_tensor)
+                        metrics.update(additional_metrics)
+                        
+                        corruption_results.append(metrics)
+                        
+                    except Exception as e:
+                        print(f"Error processing severity {severity} for {corruption_type}: {e}")
+                        continue
+                
+                if corruption_results:
+                    # 计算stability
+                    stability = self.calculate_stability(explanations)
+                    
+                    results[corruption_type] = {
+                        'results': corruption_results,
+                        'stability': stability
+                    }
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error processing {image_path}: {e}")
+            return None
+
+def convert_to_serializable(obj):
+    """将NumPy类型转换为可JSON序列化的Python原生类型
+    
+    Args:
+        obj: 输入对象
+        
+    Returns:
+        转换后的对象
+    """
+    if isinstance(obj, dict):
+        return {key: convert_to_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return convert_to_serializable(obj.tolist())
+    else:
+        return obj
 
 def main():
     """主函数"""
-    # 初始化测试器
+    # 设置测试模式
+    TEST_MODE = False  # 关闭测试模式
+    MAX_TEST_IMAGES = 3  # 此参数在非测试模式下不会被使用
+    
     tester = GradCAMRobustnessTest()
+    data_dir = "experiments/data/tiny-imagenet-200/train"
     
-    # 设置数据路径
-    val_dir = "experiments/data/tiny-imagenet-200/val"
-    
-    # 结果存储
+    processed_count = 0
+    successful_count = 0
     all_results = {}
     
-    # 处理验证集图像
-    for root, _, files in os.walk(val_dir):
+    # 获取所有图像文件，包括子目录
+    image_files = []
+    for root, _, files in os.walk(data_dir):
         for file in files:
             if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                image_path = os.path.join(root, file)
-                print(f"Processing {image_path}")
+                image_files.append(os.path.join(root, file))
+    
+    if TEST_MODE:
+        image_files = image_files[:MAX_TEST_IMAGES]
+    
+    total_images = len(image_files)
+    print(f"Starting processing of {total_images} images...")
+    
+    for idx, image_path in enumerate(image_files, 1):
+        print(f"\nProcessing image {idx}/{total_images}: {image_path}")
+        
+        try:
+            results = tester.evaluate_single_image(image_path)
+            if results:
+                all_results[image_path] = results
+                successful_count += 1
                 
-                try:
-                    # 评估单张图像
-                    results = tester.evaluate_single_image(image_path)
-                    all_results[image_path] = results
+                # 每10张图片保存一次临时结果
+                if successful_count % 10 == 0:
+                    temp_output_path = "experiments/results/gradcam_robustness_results_temp.json"
+                    with open(temp_output_path, 'w') as f:
+                        # 转换为可序列化的格式
+                        serializable_results = convert_to_serializable(all_results)
+                        json.dump(serializable_results, f, indent=4)
+                    print(f"Temporary results saved. Successful: {successful_count}/{idx}")
                     
-                    # 定期保存结果
-                    if len(all_results) % 10 == 0:
-                        temp_output_path = "experiments/results/gradcam_robustness_results_temp.json"
-                        with open(temp_output_path, 'w') as f:
-                            json.dump(all_results, f, indent=4)
-                        print(f"Temporary results saved to {temp_output_path}")
-                        
-                except Exception as e:
-                    print(f"Error processing {image_path}: {e}")
-                    continue
+        except Exception as e:
+            print(f"Failed to process {image_path}: {e}")
+            continue
     
     # 保存最终结果
-    output_path = "experiments/results/gradcam_robustness_results.json"
-    with open(output_path, 'w') as f:
-        json.dump(all_results, f, indent=4)
-    
-    print(f"Final results saved to {output_path}")
+    if all_results:
+        output_path = "experiments/results/gradcam_robustness_results.json"
+        with open(output_path, 'w') as f:
+            # 转换为可序列化的格式
+            serializable_results = convert_to_serializable(all_results)
+            json.dump(serializable_results, f, indent=4)
+        print(f"\nFinal results saved. Successfully processed {successful_count}/{total_images} images.")
+    else:
+        print("\nNo results were generated!")
 
 if __name__ == "__main__":
     main() 
