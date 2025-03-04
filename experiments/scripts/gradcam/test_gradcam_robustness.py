@@ -552,7 +552,7 @@ def main():
     MAX_TEST_IMAGES = 3  # 此参数在非测试模式下不会被使用
     
     tester = GradCAMRobustnessTest()
-    data_dir = "experiments/data/tiny-imagenet-200/train"
+    data_dir = "experiments/data/tiny-imagenet-200/val"
     
     processed_count = 0
     successful_count = 0
