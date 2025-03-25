@@ -361,7 +361,7 @@ def convert_to_serializable(obj):
 
 def main():
     parser = argparse.ArgumentParser(description='GradCAM Robustness Test')
-    parser.add_argument('--model', type=str, choices=['standard', 'robust'], default='standard',
+    parser.add_argument('--model', type=str, choices=['standard', 'robust'], default='robust',
                         help='Model type: standard (ResNet50) or robust (RobustBench Salman2020Do_50_2)')
     parser.add_argument('--test', action='store_true', help='Run in test mode with only 10 images')
     args = parser.parse_args()
@@ -371,17 +371,17 @@ def main():
     
     # 根据选择的模型类型设置输出文件路径
     if args.model == "standard":
-        temp_output_path = "experiments/results/gradcam_robustness_results_temp.json"
-        output_path = "experiments/results/gradcam_robustness_results.json"
+        temp_output_path = "/workspace/experiments/results/gradcam_robustness_results_temp.json"
+        output_path = "/workspace/experiments/results/gradcam_robustness_results.json"
     else:
-        temp_output_path = "experiments/results/gradcam_robustness_robustbench_results_temp.json"
-        output_path = "experiments/results/gradcam_robustness_robustbench_results.json"
+        temp_output_path = "/workspace/experiments/results/gradcam_robustness_robustbench_results_temp.json"
+        output_path = "/workspace/experiments/results/gradcam_robustness_robustbench_results.json"
     
     # 确保结果目录存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     tester = GradCAMRobustnessTest(model_type=args.model)
-    data_dir = "experiments/data/tiny-imagenet-200/val"
+    data_dir = "/workspace/experiments/data/tiny-imagenet-200/val"
     
     processed_count = 0
     successful_count = 0
