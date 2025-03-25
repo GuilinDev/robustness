@@ -9,12 +9,21 @@ import json
 from torchvision import transforms
 import cv2
 import time
+import argparse
 from typing import Dict, List, Tuple, Optional
 from scipy.ndimage import zoom, map_coordinates
 from skimage.filters import gaussian
 from skimage import util as sk_util
 from io import BytesIO
 from sklearn.metrics import mutual_info_score
+
+# 添加RobustBench相关导入
+try:
+    from robustbench.utils import load_model
+    ROBUSTBENCH_AVAILABLE = True
+except ImportError:
+    ROBUSTBENCH_AVAILABLE = False
+    print("RobustBench not installed. Only standard models will be available.")
 
 def clipped_zoom(img, zoom_factor):
     """Center-crop an image after zooming"""
@@ -41,12 +50,49 @@ def clipped_zoom(img, zoom_factor):
 class GradCAMRobustnessTest:
     """GradCAM鲁棒性测试类"""
     
-    def __init__(self, device: torch.device = None):
+    def __init__(self, model_type="standard", device: torch.device = None):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+        
+        # 根据model_type选择不同的模型
+        self.model_type = model_type
+        if model_type == "standard":
+            self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+            print("Loaded standard ResNet50 model")
+            # 为标准ResNet50设置目标层
+            target_layers = [self.model.layer4[-1]]
+        elif model_type == "robust" and ROBUSTBENCH_AVAILABLE:
+            self.model = load_model(model_name='Salman2020Do_50_2', dataset='imagenet', threat_model='Linf')
+            print("Loaded RobustBench Salman2020Do_50_2 model")
+            # 检查模型结构和层
+            print(f"Model type: {type(self.model).__name__}")
+            # 打印模型的子模块名称，帮助找到正确的target layer
+            for name, module in self.model.named_children():
+                print(f"Module name: {name}, Type: {type(module).__name__}")
+            
+            # 尝试为Salman2020Do模型设置合适的目标层
+            # 由于出现AttributeError，这里我们需要检查模型结构并调整
+            if hasattr(self.model, 'layer4'):
+                target_layers = [self.model.layer4[-1]]
+            elif hasattr(self.model, 'features') and isinstance(self.model.features, torch.nn.Sequential):
+                # 如果模型使用了Sequential结构的features，选择最后一个卷积层
+                conv_layers = [m for m in self.model.features.modules() if isinstance(m, torch.nn.Conv2d)]
+                if conv_layers:
+                    target_layers = [conv_layers[-1]]
+                else:
+                    raise ValueError("No convolutional layers found in the model")
+            else:
+                # 尝试寻找任何卷积层作为备选
+                conv_layers = [m for m in self.model.modules() if isinstance(m, torch.nn.Conv2d)]
+                if conv_layers:
+                    target_layers = [conv_layers[-1]]
+                else:
+                    raise ValueError("Cannot determine appropriate target layers for GradCAM")
+        else:
+            raise ValueError(f"Invalid model_type {model_type} or RobustBench not available")
+            
         self.model = self.model.to(self.device)
         self.model.eval()
-        self.gradcam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
+        self.gradcam = GradCAM(model=self.model, target_layers=target_layers)
         self.transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
@@ -311,9 +357,27 @@ def convert_to_serializable(obj):
         return obj
 
 def main():
-    TEST_MODE = False  # 启用测试模式，处理10张图片
+    parser = argparse.ArgumentParser(description='GradCAM Robustness Test')
+    parser.add_argument('--model', type=str, choices=['standard', 'robust'], default='standard',
+                        help='Model type: standard (ResNet50) or robust (RobustBench Salman2020Do_50_2)')
+    parser.add_argument('--test', action='store_true', help='Run in test mode with only 10 images')
+    args = parser.parse_args()
+    
+    TEST_MODE = args.test
     MAX_TEST_IMAGES = 10
-    tester = GradCAMRobustnessTest()
+    
+    # 根据选择的模型类型设置输出文件路径
+    if args.model == "standard":
+        temp_output_path = "experiments/results/gradcam_robustness_results_temp.json"
+        output_path = "experiments/results/gradcam_robustness_results.json"
+    else:
+        temp_output_path = "experiments/results/gradcam_robustness_robustbench_results_temp.json"
+        output_path = "experiments/results/gradcam_robustness_robustbench_results.json"
+    
+    # 确保结果目录存在
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    tester = GradCAMRobustnessTest(model_type=args.model)
     data_dir = "experiments/data/tiny-imagenet-200/val"
     
     processed_count = 0
@@ -330,7 +394,7 @@ def main():
         image_files = image_files[:MAX_TEST_IMAGES]
     
     total_images = len(image_files)
-    print(f"Starting processing of {total_images} images...")
+    print(f"Starting processing of {total_images} images with {args.model} model...")
     
     for idx, image_path in enumerate(image_files, 1):
         print(f"\nProcessing image {idx}/{total_images}: {image_path}")
@@ -340,21 +404,19 @@ def main():
                 all_results[image_path] = results
                 successful_count += 1
                 if successful_count % 10 == 0:  # 每10张图片保存一次临时结果
-                    temp_output_path = "experiments/results/gradcam_robustness_results_temp.json"
                     with open(temp_output_path, 'w') as f:
                         serializable_results = convert_to_serializable(all_results)
                         json.dump(serializable_results, f, indent=4)
-                    print(f"Temporary results saved. Successful: {successful_count}/{idx}")
+                    print(f"Temporary results saved to {temp_output_path}. Successful: {successful_count}/{idx}")
         except Exception as e:
             print(f"Failed to process {image_path}: {e}")
             continue
     
     if all_results:
-        output_path = "experiments/results/gradcam_robustness_results.json"
         with open(output_path, 'w') as f:
             serializable_results = convert_to_serializable(all_results)
             json.dump(serializable_results, f, indent=4)
-        print(f"\nFinal results saved. Successfully processed {successful_count}/{total_images} images.")
+        print(f"\nFinal results saved to {output_path}. Successfully processed {successful_count}/{total_images} images.")
     else:
         print("\nNo results were generated!")
 

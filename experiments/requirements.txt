@@ -1,0 +1,15 @@
+# GradCAM Robustness Test Dependencies
+torch==2.2.2
+torchvision==0.17.2
+numpy==1.24.3
+pillow==11.1.0
+opencv-python==4.11.0.86
+scikit-image==0.25.1
+scikit-learn==1.6.1
+scipy==1.15.1
+matplotlib==3.10.0
+pandas==2.2.3
+seaborn==0.13.2
+robustbench==1.1
+grad-cam @ git+https://github.com/jacobgil/pytorch-grad-cam.git@fd4b5c863fbfc06b23d2d396413e08831c2c2ecf
+tqdm==4.67.1
