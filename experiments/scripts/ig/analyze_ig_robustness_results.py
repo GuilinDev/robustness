@@ -111,51 +111,19 @@ class IGRobustnessAnalyzer:
                 columns=self.corruption_types
             )
             
-            # 为稳定性指标调整值范围，确保热图显示合理的颜色范围
-            if metric == 'stability':
-                # 检查是否所有值都非常接近
-                values = heatmap_df.values.flatten()
-                values = values[~np.isnan(values)]  # 去除NaN值
-                
-                if values.size > 0:
-                    # 如果最大值和最小值差异很小，调整颜色映射的最小值和最大值
-                    vmin = values.min()
-                    vmax = values.max()
-                    
-                    # 如果值的范围太小，进行调整以确保可视化效果
-                    if vmax - vmin < 0.1:
-                        vmean = (vmax + vmin) / 2
-                        vmin = max(0, vmean - 0.05)
-                        vmax = min(1, vmean + 0.05)
-                else:
-                    vmin = 0
-                    vmax = 1
-                    
-                # 绘制热图
-                plt.figure(figsize=(12, 6))
-                sns.heatmap(
-                    heatmap_df,
-                    annot=True,
-                    cmap='coolwarm',
-                    fmt='.3f',
-                    linewidths=.5,
-                    annot_kws={"size": 8},
-                    cbar_kws={'label': metric, 'shrink': 0.5},
-                    vmin=vmin,
-                    vmax=vmax
-                )
-            else:
-                # 绘制热图
-                plt.figure(figsize=(12, 6))
-                sns.heatmap(
-                    heatmap_df,
-                    annot=True,
-                    cmap='coolwarm',
-                    fmt='.3f',
-                    linewidths=.5,
-                    annot_kws={"size": 8},
-                    cbar_kws={'label': metric, 'shrink': 0.5}
-                )
+            # 设置热图参数
+            plt.figure(figsize=(12, 6))
+            
+            # 绘制热图，所有指标使用相同的风格设置
+            sns.heatmap(
+                heatmap_df,
+                annot=True,
+                cmap='coolwarm',
+                fmt='.3f',
+                linewidths=.5,
+                annot_kws={"size": 8},
+                cbar_kws={'label': metric, 'shrink': 0.5}
+            )
             
             # 调整标题和标签
             plt.title(f"{self.metric_names[metric]} by Corruption Type and Severity", fontsize=12)
