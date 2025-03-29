@@ -133,7 +133,7 @@ For best performance on a GPU instance:
 - `analyze_ig_robustness_results.py`: 结果分析脚本，生成报告和可视化
 - `requirements.txt`: 依赖项列表
 - `run_ig_test.sh`: 运行标准模型完整测试的脚本
-- `run_ig_test_robust.sh`: 运行健壮模型完整测试的脚本
+- `run_ig_test_robust.sh`: 运行鲁棒模型完整测试的脚本
 - `run_ig_test_local.sh`: 本地测试脚本（仅处理10张图片）
 
 ## 准备工作
@@ -171,7 +171,7 @@ nohup bash experiments/scripts/ig/run_ig_test.sh > ig_standard_log.out 2>&1 &
 echo $!
 ```
 
-### 3. 使用nohup运行健壮模型测试（后台运行）
+### 3. 使用nohup运行鲁棒模型测试（后台运行）
 
 ```bash
 # 确保在项目根目录运行
@@ -184,13 +184,13 @@ echo $!
 
 ### 4. 检查测试进度
 
-您可以通过以下方式检查测试进度：
+可以通过以下方式检查测试进度：
 
 ```bash
 # 查看标准模型测试的日志
 tail -f ig_standard_log.out
 
-# 查看健壮模型测试的日志
+# 查看鲁棒模型测试的日志
 tail -f ig_robust_log.out
 
 # 查看临时结果文件大小
@@ -200,19 +200,19 @@ ls -lh experiments/results/ig_robustness_robust_temp.json
 
 ### 5. 手动运行分析脚本（如果测试脚本中没有自动运行）
 
-等测试完成后，您可以手动运行分析脚本：
+等测试完成后，可以手动运行分析脚本：
 
 ```bash
 # 分析标准模型结果
 python experiments/scripts/ig/analyze_ig_robustness_results.py \
   --results_path experiments/results/ig_robustness_standard_results.json \
-  --figures_dir experiments/results/figures/ig_standard \
+  --figures_dir experiments/results/ig_standard_figures \
   --report_path experiments/results/ig_standard_analysis_report.md
 
-# 分析健壮模型结果
+# 分析鲁棒模型结果
 python experiments/scripts/ig/analyze_ig_robustness_results.py \
   --results_path experiments/results/ig_robustness_robust_results.json \
-  --figures_dir experiments/results/figures/ig_robust \
+  --figures_dir experiments/results/ig_robust_figures \
   --report_path experiments/results/ig_robust_analysis_report.md
 ```
 
@@ -224,23 +224,23 @@ python experiments/scripts/ig/analyze_ig_robustness_results.py \
   - 结果JSON：`experiments/results/ig_robustness_standard_results.json`
   - 可视化：`experiments/results/ig_viz_standard/`
   - 分析报告：`experiments/results/ig_standard_analysis_report.md`
-  - 热图：`experiments/results/figures/ig_standard/`
+  - 热图：`experiments/results/ig_standard_figures/`
 
-- 健壮模型：
+- 鲁棒模型：
   - 结果JSON：`experiments/results/ig_robustness_robust_results.json`
   - 可视化：`experiments/results/ig_viz_robust/`
   - 分析报告：`experiments/results/ig_robust_analysis_report.md`
-  - 热图：`experiments/results/figures/ig_robust/`
+  - 热图：`experiments/results/ig_robust_figures/`
 
 - 本地测试：
   - 结果JSON：`experiments/results/ig_robustness_local_results.json`
   - 可视化：`experiments/results/ig_viz_local/`
   - 分析报告：`experiments/results/ig_local_analysis_report.md`
-  - 热图：`experiments/results/figures/ig_local/`
+  - 热图：`experiments/results/ig_local_figures/`
 
 ## 比较分析
 
-为了比较标准模型和健壮模型的结果，您可以手动比较两个报告:
+为了比较标准模型和鲁棒模型的结果，可以手动比较两个报告:
 
 ```bash
 # 查看两个报告
@@ -248,8 +248,8 @@ cat experiments/results/ig_standard_analysis_report.md
 cat experiments/results/ig_robust_analysis_report.md
 
 # 比较热图
-ls experiments/results/figures/ig_standard/
-ls experiments/results/figures/ig_robust/
+ls experiments/results/ig_standard_figures/
+ls experiments/results/ig_robust_figures/
 ```
 
-您也可以编写额外的Python脚本来直接比较两个JSON结果文件中的指标。 
+也可以编写额外的Python脚本来直接比较两个JSON结果文件中的指标。 

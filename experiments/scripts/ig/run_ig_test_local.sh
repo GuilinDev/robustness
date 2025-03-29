@@ -7,7 +7,7 @@ RANDOM_SEED=42     # Fixed random seed for reproducibility
 
 # Ensure directory structure exists
 mkdir -p experiments/results/ig_viz_local
-mkdir -p experiments/results/figures/ig_local
+mkdir -p experiments/results/ig_local_figures
 mkdir -p experiments/data/samples
 
 # Install required dependencies
@@ -50,7 +50,7 @@ fi
 RESULTS_FILE="experiments/results/ig_robustness_local_results.json"
 TEMP_FILE="experiments/results/ig_robustness_local_temp.json"
 VIZ_DIR="experiments/results/ig_viz_local"
-FIGURES_DIR="experiments/results/figures/ig_local"
+FIGURES_DIR="experiments/results/ig_local_figures"
 REPORT_PATH="experiments/results/ig_local_analysis_report.md"
 
 # Create temporary script with modified n_steps

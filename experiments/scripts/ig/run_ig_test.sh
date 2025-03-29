@@ -9,7 +9,7 @@ RANDOM_SEED=42     # Fixed random seed for reproducibility
 
 # Ensure directory structure exists
 mkdir -p experiments/results/ig_viz
-mkdir -p experiments/results/figures/ig
+mkdir -p experiments/results/ig_standard_figures
 mkdir -p experiments/data/samples
 
 # Install required dependencies
@@ -26,7 +26,7 @@ if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
   RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
   TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
   VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/figures/ig_standard"
+  FIGURES_DIR="experiments/results/ig_standard_figures"
   REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
   
   mkdir -p $VIZ_DIR
@@ -71,7 +71,7 @@ else
   RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
   TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
   VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/figures/ig_standard"
+  FIGURES_DIR="experiments/results/ig_standard_figures"
   REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
   IMAGE_DIR="experiments/data/tiny-imagenet-200/val"
   
