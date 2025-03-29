@@ -1,4 +1,4 @@
-# GradCAM Robustness Test Dependencies
+# GradCAM and Integrated Gradients Robustness Test Dependencies
 torch==2.2.2
 torchvision==0.17.2
 numpy==1.24.3
@@ -13,3 +13,4 @@ seaborn==0.13.2
 robustbench==1.1
 grad-cam @ git+https://github.com/jacobgil/pytorch-grad-cam.git@fd4b5c863fbfc06b23d2d396413e08831c2c2ecf
 tqdm==4.67.1
+captum==0.6.0

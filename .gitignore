@@ -4,8 +4,14 @@
 .env.development
 .env.production
 .env.test
+.idea
+*.xml
 
 .venv
 /experiments/data
+/experiments/results
+/models/
 *.png
 *.json
+/writing
+*analysis_report.md

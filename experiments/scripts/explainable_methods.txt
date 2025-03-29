@@ -1,0 +1,20 @@
+Integrated Gradients (IG，积分梯度法)
+优势：理论基础更扎实，能够为每个像素分配重要性
+实现：通过captum库容易实现
+处理速度：与GradCAM相当，可能更快
+LIME (局部可解释的模型无关解释)
+优势：模型无关，适用于任何黑盒模型
+实现：通过lime库可用
+处理速度：比GradCAM慢但可以并行化
+SHAP (Shapley加性解释)
+优势：理论基础强，结合多种归因方法
+实现：通过shap库可用
+处理速度：计算密集，但可以使用GradientExplainer加速
+遮挡敏感度分析 (Occlusion Sensitivity)
+优势：概念简单，模型无关
+实现：易于从头实现
+处理速度：中等，可以通过调整块大小加速
+DeepLIFT
+优势：比简单梯度提供更好的归因
+实现：captum库提供
+处理速度：通常比SHAP或LIME更快

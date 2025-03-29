@@ -16,7 +16,6 @@ from skimage.filters import gaussian
 from skimage import util as sk_util
 from io import BytesIO
 from sklearn.metrics import mutual_info_score
-from torch.cuda.amp import autocast, GradScaler
 
 # 添加RobustBench相关导入
 try:
@@ -213,14 +212,12 @@ class GradCAMRobustnessTest:
 
     def calculate_additional_metrics(self, original_tensor: torch.Tensor, corrupted_tensor: torch.Tensor) -> Dict:
         with torch.no_grad():
-            with autocast():
-                original_output = self.model(original_tensor)
+            original_output = self.model(original_tensor)
             original_pred = torch.argmax(original_output, dim=1)
             original_probs = torch.softmax(original_output, dim=1)
             original_top5 = torch.topk(original_output, k=5, dim=1)[1][0]
             
-            with autocast():
-                corrupted_output = self.model(corrupted_tensor)
+            corrupted_output = self.model(corrupted_tensor)
             corrupted_pred = torch.argmax(corrupted_output, dim=1)
             corrupted_probs = torch.softmax(corrupted_output, dim=1)
             corrupted_top5 = torch.topk(corrupted_output, k=5, dim=1)[1][0]

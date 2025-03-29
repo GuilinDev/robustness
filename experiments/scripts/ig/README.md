@@ -15,7 +15,7 @@
 
 ### 本地测试
 
-在将代码上传到GPU服务器之前，您可以在本地运行测试模式验证代码是否正常工作：
+在将代码上传到GPU服务器之前，可以在本地运行测试模式验证代码是否正常工作：
 
 ```bash
 bash experiments/scripts/ig/run_ig_test_local.sh
@@ -32,7 +32,7 @@ bash experiments/scripts/ig/run_ig_test_local.sh
 bash experiments/scripts/ig/run_ig_test.sh
 ```
 
-运行健壮模型测试：
+运行Robust模型测试：
 ```bash
 bash experiments/scripts/ig/run_ig_test_robust.sh
 ```
