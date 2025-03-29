@@ -15,6 +15,10 @@ mkdir -p experiments/data/samples
 # Install required dependencies
 pip install -r experiments/scripts/ig/requirements.txt
 
+# 安装RobustBench库（用于鲁棒模型）
+echo "安装RobustBench库..."
+pip install git+https://github.com/RobustBench/robustbench.git
+
 # Ensure OpenCV system dependencies are installed
 if ! ldconfig -p | grep -q libGL.so.1 2>/dev/null; then
   echo "Installing system dependencies for OpenCV..."

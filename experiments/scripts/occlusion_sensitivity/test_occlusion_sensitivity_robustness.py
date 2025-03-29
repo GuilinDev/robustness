@@ -59,11 +59,26 @@ class OcclusionSensitivityRobustnessTest:
         if model_type == "standard":
             self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
             print("Loaded standard ResNet50 model")
-        elif model_type == "robust" and ROBUSTBENCH_AVAILABLE:
-            self.model = load_model(model_name='Salman2020Do_50_2', dataset='imagenet', threat_model='Linf')
-            print("Loaded RobustBench Salman2020Do_50_2 model")
+        elif model_type == "robust":
+            if ROBUSTBENCH_AVAILABLE:
+                try:
+                    self.model = load_model(model_name='Salman2020Do_50_2', dataset='imagenet', threat_model='Linf')
+                    print("Loaded RobustBench Salman2020Do_50_2 model")
+                except Exception as e:
+                    print(f"警告: 无法加载鲁棒模型, 回退到标准模型. 错误: {str(e)}")
+                    self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+                    print("回退使用标准 ResNet50 模型")
+                    self.model_type = "standard"  # 更新模型类型
+            else:
+                print("警告: RobustBench未安装或不可用, 回退到标准模型")
+                self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+                print("回退使用标准 ResNet50 模型")
+                self.model_type = "standard"  # 更新模型类型
         else:
-            raise ValueError(f"Invalid model_type {model_type} or RobustBench not available")
+            print(f"警告: 未知的模型类型 '{model_type}', 回退到标准模型")
+            self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+            print("回退使用标准 ResNet50 模型")
+            self.model_type = "standard"  # 更新模型类型
             
         self.model = self.model.to(self.device)
         self.model.eval()

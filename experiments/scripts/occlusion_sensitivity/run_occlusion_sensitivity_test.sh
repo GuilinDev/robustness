@@ -10,6 +10,10 @@ TEMP_FILE="${OUTPUT_DIR}/temp_results.json"
 OUTPUT_FILE="${OUTPUT_DIR}/occlusion_sensitivity_results.json"
 VIZ_DIR="${OUTPUT_DIR}/visualizations"
 
+# 安装依赖
+echo "安装依赖..."
+pip install -r "${SCRIPT_DIR}/requirements.txt"
+
 # 解析命令行参数
 SAVE_VIZ=false
 PATCH_SIZE=16

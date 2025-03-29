@@ -10,6 +10,10 @@ TEMP_FILE="${OUTPUT_DIR}/temp_test_results.json"
 OUTPUT_FILE="${OUTPUT_DIR}/occlusion_sensitivity_test_results.json"
 VIZ_DIR="${OUTPUT_DIR}/visualizations"
 
+# 安装依赖
+echo "安装依赖..."
+pip install -r "${SCRIPT_DIR}/requirements.txt"
+
 # 确保输出目录存在
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p "${VIZ_DIR}"
