@@ -16,13 +16,13 @@ plt.rcParams.update({
     "savefig.facecolor": "white"
 })
 
-class IGRobustnessAnalyzer:
-    """分析IG鲁棒性实验结果的类"""
+class SHAPRobustnessAnalyzer:
+    """分析SHAP鲁棒性实验结果的类"""
     
     def __init__(self, results_path: str):
         """初始化分析器
         Args:
-            results_path: 主结果文件的路径 (ig_robustness_results.json)
+            results_path: 主结果文件的路径 (shap_robustness_results.json)
         """
         self.results_path = results_path
         self.results = self._load_results()
@@ -171,7 +171,7 @@ class IGRobustnessAnalyzer:
         
         # 生成Markdown表格
         with open(output_path, 'w') as f:
-            f.write('# Integrated Gradients Robustness Analysis Report\n\n')
+            f.write('# SHAP Robustness Analysis Report\n\n')
             f.write(f'## Results by Corruption Type (Severity Level {severity_level})\n\n')
             f.write('*表格按照准确率从高到低排序*\n\n')
             
@@ -286,7 +286,7 @@ class IGRobustnessAnalyzer:
             
             # 总结发现
             f.write("\n## Summary\n\n")
-            f.write("This analysis evaluated the robustness of Integrated Gradients explanations across 15 different corruption types. ")
+            f.write("This analysis evaluated the robustness of SHAP explanations across 15 different corruption types. ")
             f.write("The results show how different corruptions affect both model predictions and explanation quality.\n\n")
             
             # 根据实际结果给出结论，实际应用中可能需要修改
@@ -321,12 +321,12 @@ def main():
     """主函数"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Analyze IG robustness test results')
-    parser.add_argument('--results_path', type=str, default='experiments/results/ig_robustness_results.json',
-                       help='Path to the IG robustness results JSON file')
-    parser.add_argument('--figures_dir', type=str, default='experiments/results/figures/ig',
+    parser = argparse.ArgumentParser(description='Analyze SHAP robustness test results')
+    parser.add_argument('--results_path', type=str, default='experiments/results/shap_robustness_results.json',
+                       help='Path to the SHAP robustness results JSON file')
+    parser.add_argument('--figures_dir', type=str, default='experiments/results/figures/shap',
                        help='Directory to save the generated figures')
-    parser.add_argument('--report_path', type=str, default='experiments/results/ig_analysis_report.md',
+    parser.add_argument('--report_path', type=str, default='experiments/results/shap_analysis_report.md',
                        help='Path to save the analysis report')
     parser.add_argument('--severity_level', type=int, default=3, choices=[1, 2, 3, 4, 5],
                        help='Severity level to use for the report (1-5)')
@@ -338,7 +338,7 @@ def main():
     os.makedirs(os.path.dirname(args.report_path), exist_ok=True)
     
     # 运行分析
-    analyzer = IGRobustnessAnalyzer(args.results_path)
+    analyzer = SHAPRobustnessAnalyzer(args.results_path)
     analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level)
 
 if __name__ == "__main__":
