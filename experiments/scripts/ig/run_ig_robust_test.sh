@@ -104,12 +104,29 @@ python $SCRIPT_PATH \
   --save_viz \
   --viz_dir $VIZ_DIR
 
-# Analyze results
-python experiments/scripts/ig/analyze_ig_robustness_results.py \
-  --results_path $RESULTS_FILE \
-  --figures_dir $FIGURES_DIR \
-  --report_path $REPORT_PATH \
-  --severity_level 3
+# 检查测试是否成功
+if [ $? -eq 0 ]; then
+  echo "测试成功完成！"
+  
+  # 分析结果
+  echo "正在分析结果..."
+  python experiments/scripts/ig/analyze_ig_robustness_results.py \
+    --results_path $RESULTS_FILE \
+    --figures_dir $FIGURES_DIR \
+    --report_path $REPORT_PATH \
+    --severity_level 3
+    
+  # 检查分析是否成功
+  if [ $? -eq 0 ]; then
+    echo "分析成功完成！"
+  else
+    echo "分析失败！请检查错误信息。"
+    exit 1
+  fi
+else
+  echo "测试失败！请检查错误信息。"
+  exit 1
+fi
 
 # Clean up temporary script if created
 if [ "$OPTIMIZE" = true ] && [ $N_STEPS -gt 0 ]; then
