@@ -5,6 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import Dict
 import os
+import argparse
 
 # 设置matplotlib和seaborn样式
 sns.set_style("whitegrid")
@@ -203,9 +204,11 @@ class GradCAMRobustnessAnalyzer:
         """
         # 收集稳定性数据 - 直接从主结果文件中获取
         stability_data = {}
+        processed_images = set()
         
         # 按照corruption_type和severity收集
         for image_path, image_results in self.results.items():
+            processed_images.add(image_path)
             for corruption_type, corruption_data in image_results.items():
                 if corruption_type in self.corruption_types:
                     if corruption_type not in stability_data:
@@ -233,8 +236,13 @@ class GradCAMRobustnessAnalyzer:
                 else:
                     avg_stability[corruption_type][severity] = np.nan
         
-        # 打印调试信息
-        print("找到稳定性数据：", {k: {s: len(v) for s, v in sv.items()} for k, sv in stability_data.items()})
+        # 打印调试信息 - 显示实际处理的图片数量
+        print(f"已处理 {len(processed_images)} 张图片")
+        print("稳定性数据计数 (每个腐蚀/严重程度):")
+        stability_counts = {k: {s: len(v) for s, v in sv.items()} for k, sv in stability_data.items()}
+        # 打印部分计数以避免过长输出
+        count_summary = {k: stability_counts[k] for k in list(stability_counts.keys())[:3]} 
+        print(count_summary, "...")
         
         # 生成热图 - 显示所有severity级别
         plt.figure(figsize=(12, 6))
@@ -288,20 +296,34 @@ class GradCAMRobustnessAnalyzer:
         # 生成报告表格
         self.generate_report_table(report_path, severity_level)
         
-        # 生成稳定性热图
-        self._plot_stability_chart(figures_dir)
+        # 生成稳定性热图 (现在由plot_metric_heatmaps统一处理，如果需要单独逻辑再取消注释)
+        # self._plot_stability_chart(figures_dir) # 之前 plot_metric_heatmaps 会跳过 stability
         
-        print(f"Analysis completed. Heatmaps saved in: {figures_dir}")
-        print(f"Report saved as: {report_path}")
+        print(f"分析完成。热图保存在: {figures_dir}")
+        print(f"报告保存为: {report_path}")
 
 def main():
     """主函数"""
-    results_path = "experiments/results/gradcam_robustness_results.json"
-    figures_dir = "experiments/results/figures"
-    report_path = "experiments/results/analysis_report.md"
+    parser = argparse.ArgumentParser(description='Analyze GradCAM robustness results.')
+    parser.add_argument('--results_path', type=str, 
+                        default='experiments/results/gradcam_robustness_results.json', 
+                        help='Path to the GradCAM results JSON file.')
+    parser.add_argument('--figures_dir', type=str, 
+                        default='experiments/results/figures', 
+                        help='Directory to save the heatmap figures.')
+    parser.add_argument('--report_path', type=str, 
+                        default='experiments/results/analysis_report.md', 
+                        help='Path to save the analysis report.')
+    parser.add_argument('--severity_level', type=int, default=3, 
+                        help='Severity level to focus on in the report (1-5).')
+
+    args = parser.parse_args()
     
-    analyzer = GradCAMRobustnessAnalyzer(results_path)
-    analyzer.run_analysis(figures_dir, report_path, severity_level=3)
+    # 使用命令行参数创建分析器实例
+    analyzer = GradCAMRobustnessAnalyzer(args.results_path)
+    
+    # 使用命令行参数运行分析
+    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level)
 
 if __name__ == "__main__":
     main() 
