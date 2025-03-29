@@ -8,8 +8,8 @@ RANDOM_SEED=42     # Fixed random seed for reproducibility
 # End of configuration
 
 # Ensure directory structure exists
-mkdir -p experiments/results/ig_viz
-mkdir -p experiments/results/figures/ig
+mkdir -p experiments/results/ig_viz_robust
+mkdir -p experiments/results/figures/ig_robust
 mkdir -p experiments/data/samples
 
 # Install required dependencies
@@ -23,11 +23,11 @@ fi
 
 # Create output filenames based on optimization settings
 if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
-  RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
-  TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
-  VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/figures/ig_standard"
-  REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
+  RESULTS_FILE="experiments/results/ig_robustness_robust_results.json"
+  TEMP_FILE="experiments/results/ig_robustness_robust_temp.json"
+  VIZ_DIR="experiments/results/ig_viz_robust"
+  FIGURES_DIR="experiments/results/figures/ig_robust"
+  REPORT_PATH="experiments/results/ig_robust_analysis_report.md"
   
   mkdir -p $VIZ_DIR
   mkdir -p $FIGURES_DIR
@@ -40,15 +40,16 @@ if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
   # Define the sample list file to ensure standard and robust use same samples
   SAMPLE_LIST="experiments/data/samples/ig_sample_list.txt"
   
-  # If the subset directory is empty or sample list doesn't exist, create a subset with random images
-  if [ -z "$(ls -A ${TEST_DIR} 2>/dev/null)" ] || [ ! -f "$SAMPLE_LIST" ]; then
-    echo "Creating test subset with $SAMPLE_SIZE random images using seed $RANDOM_SEED..."
-    # Set random seed for reproducibility
-    export RANDOM=$RANDOM_SEED
-    
-    # Find all image files
-    find experiments/data/tiny-imagenet-200/val -type f -name "*.JPEG" | sort | shuf -n $SAMPLE_SIZE > "$SAMPLE_LIST"
-    
+  # If the sample list doesn't exist, wait for the standard test to create it
+  if [ ! -f "$SAMPLE_LIST" ]; then
+    echo "Sample list not found. Please run the standard model test script first or manually create the sample list."
+    echo "Checking for sample list at: $SAMPLE_LIST"
+    exit 1
+  fi
+  
+  # If the subset directory is empty, create it using the same sample list
+  if [ -z "$(ls -A ${TEST_DIR} 2>/dev/null)" ]; then
+    echo "Creating test subset using the same images as standard model test..."
     # Create the subset based on the sample list
     cat "$SAMPLE_LIST" | while read img; do
       # Create target directory structure identical to the original path
@@ -59,20 +60,18 @@ if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
       cp "$img" "${TEST_DIR}/${REL_PATH}"
     done
     echo "Test subset created with $(find ${TEST_DIR} -type f -name "*.JPEG" | wc -l) images"
-    echo "Sample list saved to $SAMPLE_LIST for reproducibility"
   else
     echo "Using existing test subset with $(find ${TEST_DIR} -type f -name "*.JPEG" | wc -l) images"
-    echo "Sample list already exists at $SAMPLE_LIST"
   fi
   
   # Use the subset for testing
   IMAGE_DIR=$TEST_DIR
 else
-  RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
-  TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
-  VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/figures/ig_standard"
-  REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
+  RESULTS_FILE="experiments/results/ig_robustness_robust_results.json"
+  TEMP_FILE="experiments/results/ig_robustness_robust_temp.json"
+  VIZ_DIR="experiments/results/ig_viz_robust"
+  FIGURES_DIR="experiments/results/figures/ig_robust"
+  REPORT_PATH="experiments/results/ig_robust_analysis_report.md"
   IMAGE_DIR="experiments/data/tiny-imagenet-200/val"
   
   mkdir -p $VIZ_DIR
@@ -92,8 +91,8 @@ else
   SCRIPT_PATH="experiments/scripts/ig/test_ig_robustness.py"
 fi
 
-# Run the IG test
-echo "Starting IG robustness test with standard model..."
+# Run the IG test with robust model
+echo "Starting IG robustness test with robust model..."
 echo "Image directory: $IMAGE_DIR"
 echo "Results will be saved to: $RESULTS_FILE"
 
@@ -101,7 +100,7 @@ python $SCRIPT_PATH \
   --image_dir $IMAGE_DIR \
   --output_file $RESULTS_FILE \
   --temp_file $TEMP_FILE \
-  --model_type standard \
+  --model_type robust \
   --save_viz \
   --viz_dir $VIZ_DIR
 
@@ -117,7 +116,7 @@ if [ "$OPTIMIZE" = true ] && [ $N_STEPS -gt 0 ]; then
   rm $SCRIPT_PATH
 fi
 
-echo "IG robustness test on standard model completed!"
+echo "IG robustness test on robust model completed!"
 echo "Results saved to $RESULTS_FILE"
 echo "Analysis report saved to $REPORT_PATH"
 echo "Heatmaps saved to $FIGURES_DIR" 

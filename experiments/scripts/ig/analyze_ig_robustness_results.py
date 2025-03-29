@@ -90,11 +90,6 @@ class IGRobustnessAnalyzer:
         
         # 为每个指标生成热图
         for metric in self.metrics:
-            # 如果是stability指标，使用专门的方法处理
-            if metric == 'stability':
-                self._plot_stability_chart(output_dir)
-                continue
-                
             # 计算每个噪声类型和严重程度的平均值
             heatmap_data = []
             for severity in range(1, 6):
@@ -194,85 +189,113 @@ class IGRobustnessAnalyzer:
                     col_name = self.metric_names[metric]
                     line += f" {row[col_name]:.3f} |"
                 f.write(line + "\n")
-
-    def _plot_stability_chart(self, output_dir: str):
-        """为稳定性指标生成热图
-        
-        Args:
-            output_dir: 输出目录
-        """
-        # 收集稳定性数据 - 直接从主结果文件中获取
-        stability_data = {}
-        
-        # 按照corruption_type和severity收集
-        for image_path, image_results in self.results.items():
-            for corruption_type, corruption_data in image_results.items():
-                if corruption_type in self.corruption_types:
-                    if corruption_type not in stability_data:
-                        stability_data[corruption_type] = {1: [], 2: [], 3: [], 4: [], 5: []}
-                    
-                    # 从results数组中收集每个severity的stability值
-                    for result in corruption_data.get('results', []):
-                        severity = result.get('severity')
-                        stability = result.get('stability')
-                        if severity and stability is not None:
-                            stability_data[corruption_type][severity].append(stability)
-        
-        # 检查是否有稳定性数据
-        if not stability_data or all(not any(values) for values in stability_data.values()):
-            print("警告: 未找到任何稳定性数据，跳过稳定性可视化。")
-            return
+                
+            # 添加准确率与指标相关性分析
+            f.write("\n## Correlation Between Accuracy and Metrics\n\n")
+            f.write("This section analyzes the correlation between model accuracy and explanation metrics across different corruption types.\n\n")
             
-        # 计算每个corruption_type每个severity的平均稳定性
-        avg_stability = {}
-        for corruption_type, severity_data in stability_data.items():
-            avg_stability[corruption_type] = {}
-            for severity, values in severity_data.items():
-                if values:
-                    avg_stability[corruption_type][severity] = np.mean(values)
-                else:
-                    avg_stability[corruption_type][severity] = np.nan
-        
-        # 打印调试信息
-        print("找到稳定性数据：", {k: {s: len(v) for s, v in sv.items()} for k, sv in stability_data.items()})
-        
-        # 生成热图 - 显示所有severity级别
-        plt.figure(figsize=(12, 6))
-        
-        # 创建热图数据
-        heatmap_data = []
-        for severity in range(1, 6):
-            row = []
+            # 计算相关性
+            correlations = {}
+            for metric in self.metrics:
+                col_name = self.metric_names[metric]
+                correlation = table_df['Accuracy'].corr(table_df[col_name])
+                correlations[col_name] = correlation
+            
+            # 按相关性绝对值排序
+            sorted_correlations = sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True)
+            
+            # 添加相关性表格
+            f.write("| Metric | Correlation with Accuracy |\n")
+            f.write("|--------|----------------------------|\n")
+            for metric_name, corr_value in sorted_correlations:
+                direction = "positive" if corr_value >= 0 else "negative"
+                strength = "strong" if abs(corr_value) >= 0.7 else "moderate" if abs(corr_value) >= 0.4 else "weak"
+                f.write(f"| {metric_name} | {corr_value:.3f} ({strength} {direction}) |\n")
+            
+            # 添加关于各种腐蚀类型的影响分析
+            f.write("\n## Analysis of Corruption Effects\n\n")
+            
+            # 获取最低和最高准确率的腐蚀类型
+            most_robust = table_df.iloc[0]
+            least_robust = table_df.iloc[-1]
+            
+            f.write(f"### Most and Least Robust Corruptions\n\n")
+            f.write(f"- **Most Robust**: {most_robust['Corruption']} (Accuracy: {most_robust['Accuracy']:.3f})\n")
+            f.write(f"- **Least Robust**: {least_robust['Corruption']} (Accuracy: {least_robust['Accuracy']:.3f})\n\n")
+            
+            # 分类腐蚀类型
+            noise_types = ['gaussian_noise', 'shot_noise', 'impulse_noise']
+            blur_types = ['defocus_blur', 'glass_blur', 'motion_blur', 'zoom_blur']
+            weather_types = ['snow', 'frost', 'fog']
+            digital_types = ['brightness', 'contrast', 'elastic_transform', 'pixelate', 'jpeg']
+            
+            # 计算各类腐蚀的平均准确率
+            avg_acc = {}
+            if any(c in table_df['Corruption'].values for c in noise_types):
+                noise_df = table_df[table_df['Corruption'].isin(noise_types)]
+                if not noise_df.empty:
+                    avg_acc['Noise'] = noise_df['Accuracy'].mean()
+            
+            if any(c in table_df['Corruption'].values for c in blur_types):
+                blur_df = table_df[table_df['Corruption'].isin(blur_types)]
+                if not blur_df.empty:
+                    avg_acc['Blur'] = blur_df['Accuracy'].mean()
+            
+            if any(c in table_df['Corruption'].values for c in weather_types):
+                weather_df = table_df[table_df['Corruption'].isin(weather_types)]
+                if not weather_df.empty:
+                    avg_acc['Weather'] = weather_df['Accuracy'].mean()
+            
+            if any(c in table_df['Corruption'].values for c in digital_types):
+                digital_df = table_df[table_df['Corruption'].isin(digital_types)]
+                if not digital_df.empty:
+                    avg_acc['Digital'] = digital_df['Accuracy'].mean()
+            
+            # 添加腐蚀类别分析
+            if avg_acc:
+                f.write("### Corruption Category Analysis\n\n")
+                f.write("Average accuracy by corruption category:\n\n")
+                for category, acc in sorted(avg_acc.items(), key=lambda x: x[1], reverse=True):
+                    f.write(f"- **{category}**: {acc:.3f}\n")
+            
+            # 添加关于解释方法在不同腐蚀下的表现分析
+            f.write("\n## Explanation Robustness Analysis\n\n")
+            
+            # 分析解释相关指标
+            explanation_metrics = ['similarity', 'consistency', 'localization', 'stability']
+            explanation_metric_names = [self.metric_names[m] for m in explanation_metrics if m in self.metrics]
+            
+            # 找出解释最鲁棒和最不鲁棒的腐蚀类型
+            explanation_robustness = {}
             for corruption in self.corruption_types:
-                value = avg_stability.get(corruption, {}).get(severity, np.nan)
-                row.append(value)
-            heatmap_data.append(row)
-        
-        # 创建热图数据框架
-        heatmap_df = pd.DataFrame(
-            heatmap_data, 
-            index=[f"Severity {s}" for s in range(1, 6)],
-            columns=self.corruption_types
-        )
-        
-        # 绘制热图
-        sns.heatmap(
-            heatmap_df,
-            annot=True,
-            cmap='coolwarm',  # 与其他指标保持一致的颜色映射
-            fmt='.3f',
-            linewidths=.5,
-            annot_kws={"size": 8},
-            cbar_kws={'label': 'stability', 'shrink': 0.5}
-        )
-        
-        plt.title(f"{self.metric_names['stability']} by Corruption Type and Severity", fontsize=12)
-        plt.xticks(rotation=45, ha='right', fontsize=8)
-        plt.yticks(fontsize=10)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'stability_heatmap.png'), bbox_inches='tight', dpi=300)
-        plt.close()
+                if corruption in table_df['Corruption'].values:
+                    row = table_df[table_df['Corruption'] == corruption].iloc[0]
+                    # 计算解释指标的平均值
+                    metrics_avg = np.mean([row[self.metric_names[m]] for m in explanation_metrics if m in self.metrics])
+                    explanation_robustness[corruption] = metrics_avg
+            
+            if explanation_robustness:
+                most_robust_exp = max(explanation_robustness.items(), key=lambda x: x[1])
+                least_robust_exp = min(explanation_robustness.items(), key=lambda x: x[1])
+                
+                f.write("### Explanation Robustness by Corruption Type\n\n")
+                f.write(f"- **Most Robust Explanations**: {most_robust_exp[0]} (Avg. metrics: {most_robust_exp[1]:.3f})\n")
+                f.write(f"- **Least Robust Explanations**: {least_robust_exp[0]} (Avg. metrics: {least_robust_exp[1]:.3f})\n\n")
+            
+            # 总结发现
+            f.write("\n## Summary\n\n")
+            f.write("This analysis evaluated the robustness of Integrated Gradients explanations across 15 different corruption types. ")
+            f.write("The results show how different corruptions affect both model predictions and explanation quality.\n\n")
+            
+            # 根据实际结果给出结论，实际应用中可能需要修改
+            f.write("Key findings:\n\n")
+            f.write("1. Model accuracy varies significantly across corruption types\n")
+            if explanation_robustness:
+                f.write(f"2. Explanation robustness is highest for {most_robust_exp[0]} corruptions\n")
+                f.write(f"3. Explanation robustness is lowest for {least_robust_exp[0]} corruptions\n")
+            if correlations:
+                most_correlated = sorted_correlations[0]
+                f.write(f"4. The metric most correlated with accuracy is {most_correlated[0]} (correlation: {most_correlated[1]:.3f})\n")
 
     def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3):
         """运行分析流程

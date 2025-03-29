@@ -1,6 +1,131 @@
-# Integrated Gradients (IG) 鲁棒性测试
+# Integrated Gradients (IG) Robustness Testing
 
-本目录包含用于测试 Integrated Gradients 解释方法对图像腐蚀的鲁棒性的脚本。
+This directory contains scripts for testing and analyzing the robustness of Integrated Gradients (IG) explanations against various corruptions.
+
+## Requirements
+
+### Python Dependencies
+Install the required Python packages with:
+```
+pip install -r requirements.txt
+```
+
+### System Dependencies for OpenCV
+If you encounter OpenCV related errors (`ImportError: libGL.so.1: cannot open shared object file`), install the necessary system packages:
+
+```bash
+apt-get update && apt-get install -y libgl1-mesa-glx libglib2.0-0
+```
+
+## Scripts
+
+### `run_ig_test.sh`
+Main script to run the IG robustness test on a standard ResNet model.
+
+Usage:
+```bash
+./run_ig_test.sh
+```
+
+#### Optimization Options
+The script includes optimization options at the top:
+
+```bash
+# Script configuration - Uncomment and modify these options for optimization
+OPTIMIZE=true      # Set to true to enable optimizations
+SAMPLE_SIZE=1000   # Number of images to process (set to 0 for all images)
+N_STEPS=20         # IG integration steps (original is 50, lower is faster)
+RANDOM_SEED=42     # Fixed random seed for reproducibility
+```
+
+- Set `OPTIMIZE=true` to enable optimizations
+- Adjust `SAMPLE_SIZE` to control the number of test images (1000 is recommended for quick testing)
+- Modify `N_STEPS` to change the number of integration steps (20 is recommended for faster results)
+- The `RANDOM_SEED` ensures the same images are selected for both standard and robust tests
+
+When running with optimizations, the script will:
+1. Create a subset of random images for testing
+2. Use fewer integration steps for faster computation
+3. Save a list of selected images to ensure reproducibility between standard and robust model tests
+
+### `run_ig_robust_test.sh`
+Script to run the IG robustness test on a robust (adversarially trained) ResNet model.
+
+Usage:
+```bash
+./run_ig_robust_test.sh
+```
+
+**Note:** Always run the standard model test first (`run_ig_test.sh`), as the robust model test uses the same sample list created by the standard test.
+
+### `test_ig_robustness.py`
+Python script that implements the IG robustness testing.
+
+Usage:
+```bash
+python test_ig_robustness.py --image_dir <image_directory> --output_file <output_file> --model_type <model_type>
+```
+
+Arguments:
+- `--image_dir`: Directory containing images to test
+- `--output_file`: Path to save the results
+- `--temp_file`: Path to save intermediate results
+- `--model_type`: Type of model to use ('standard' or 'robust')
+- `--save_viz`: Flag to save visualizations
+- `--viz_dir`: Directory to save visualizations
+
+### `analyze_ig_robustness_results.py`
+Script for analyzing the results of IG robustness tests.
+
+Usage:
+```bash
+python analyze_ig_robustness_results.py --results_path <results_file> --figures_dir <figures_directory> --report_path <report_file>
+```
+
+Arguments:
+- `--results_path`: Path to the results JSON file
+- `--figures_dir`: Directory to save generated figures
+- `--report_path`: Path to save the analysis report
+- `--severity_level`: Corruption severity level to analyze (default: 3)
+
+## Performance Considerations
+
+- **Processing Time**: IG is computationally intensive. The full test on all TinyImageNet validation images can take several hours or even days on a CPU.
+- **GPU Acceleration**: Running on a GPU is highly recommended and will significantly speed up processing.
+- **Memory Usage**: Processing and storing results for large datasets requires significant memory. Use the optimization options for development and testing.
+- **Storage Space**: Visualization files can consume significant disk space (multiple GB for the full dataset).
+
+## Running on GPU Instance
+
+For best performance on a GPU instance:
+
+1. Ensure CUDA is properly configured.
+2. Verify PyTorch is using the GPU:
+   ```python
+   import torch
+   print(torch.cuda.is_available())  # Should return True
+   print(torch.cuda.device_count())  # Number of available GPUs
+   ```
+3. Run the standard model test first, then the robust model test:
+   ```bash
+   # First, run the standard model test
+   nohup ./run_ig_test.sh > ig_standard_log.log 2>&1 &
+   
+   # After the standard test is complete, run the robust model test
+   nohup ./run_ig_robust_test.sh > ig_robust_log.log 2>&1 &
+   ```
+4. Monitor the process:
+   ```bash
+   tail -f ig_standard_log.log
+   tail -f ig_robust_log.log
+   ```
+
+## Common Issues and Solutions
+
+- **Gray or blank stability heatmap**: This may occur if the stability values are too uniform. The script now automatically adjusts the color mapping to improve visualization.
+- **Missing OpenCV dependencies**: Install the system packages as noted in the System Dependencies section.
+- **Process killed**: This typically occurs due to out-of-memory errors. Use the optimization options to reduce memory usage.
+- **Sample list errors**: If you see an error about missing sample list when running the robust test, ensure you've run the standard model test first.
 
 ## 文件结构
 
@@ -51,7 +176,7 @@ echo $!
 ```bash
 # 确保在项目根目录运行
 cd /path/to/robustness
-nohup bash experiments/scripts/ig/run_ig_test_robust.sh > ig_robust_log.out 2>&1 &
+nohup bash experiments/scripts/ig/run_ig_robust_test.sh > ig_robust_log.out 2>&1 &
 
 # 记录进程ID
 echo $!
@@ -69,8 +194,8 @@ tail -f ig_standard_log.out
 tail -f ig_robust_log.out
 
 # 查看临时结果文件大小
-ls -lh experiments/results/ig_robustness_results_temp.json
-ls -lh experiments/results/ig_robustness_robust_results_temp.json
+ls -lh experiments/results/ig_robustness_standard_temp.json
+ls -lh experiments/results/ig_robustness_robust_temp.json
 ```
 
 ### 5. 手动运行分析脚本（如果测试脚本中没有自动运行）
@@ -80,9 +205,9 @@ ls -lh experiments/results/ig_robustness_robust_results_temp.json
 ```bash
 # 分析标准模型结果
 python experiments/scripts/ig/analyze_ig_robustness_results.py \
-  --results_path experiments/results/ig_robustness_results.json \
-  --figures_dir experiments/results/figures/ig \
-  --report_path experiments/results/ig_analysis_report.md
+  --results_path experiments/results/ig_robustness_standard_results.json \
+  --figures_dir experiments/results/figures/ig_standard \
+  --report_path experiments/results/ig_standard_analysis_report.md
 
 # 分析健壮模型结果
 python experiments/scripts/ig/analyze_ig_robustness_results.py \
@@ -93,13 +218,13 @@ python experiments/scripts/ig/analyze_ig_robustness_results.py \
 
 ## 结果文件
 
-测试完成后，结果将保存在：
+测试完成后，结果将保存在不同目录，确保不会相互覆盖：
 
 - 标准模型：
-  - 结果JSON：`experiments/results/ig_robustness_results.json`
-  - 可视化：`experiments/results/ig_viz/`
-  - 分析报告：`experiments/results/ig_analysis_report.md`
-  - 热图：`experiments/results/figures/ig/`
+  - 结果JSON：`experiments/results/ig_robustness_standard_results.json`
+  - 可视化：`experiments/results/ig_viz_standard/`
+  - 分析报告：`experiments/results/ig_standard_analysis_report.md`
+  - 热图：`experiments/results/figures/ig_standard/`
 
 - 健壮模型：
   - 结果JSON：`experiments/results/ig_robustness_robust_results.json`
@@ -107,28 +232,24 @@ python experiments/scripts/ig/analyze_ig_robustness_results.py \
   - 分析报告：`experiments/results/ig_robust_analysis_report.md`
   - 热图：`experiments/results/figures/ig_robust/`
 
-## 命令行参数
+- 本地测试：
+  - 结果JSON：`experiments/results/ig_robustness_local_results.json`
+  - 可视化：`experiments/results/ig_viz_local/`
+  - 分析报告：`experiments/results/ig_local_analysis_report.md`
+  - 热图：`experiments/results/figures/ig_local/`
 
-测试脚本 `test_ig_robustness.py` 支持以下参数：
+## 比较分析
 
-- `--image_dir`: 图像目录路径
-- `--output_file`: 结果JSON输出路径
-- `--temp_file`: 临时结果文件路径（每处理一张图片保存一次）
-- `--model_type`: 模型类型，可选 'standard' 或 'robust'
-- `--save_viz`: 是否保存可视化
-- `--viz_dir`: 可视化保存目录
-- `--test_mode`: 是否启用测试模式
-- `--test_samples`: 测试模式下处理的图片数量
+为了比较标准模型和健壮模型的结果，您可以手动比较两个报告:
 
-## 常见问题及解决方案
+```bash
+# 查看两个报告
+cat experiments/results/ig_standard_analysis_report.md
+cat experiments/results/ig_robust_analysis_report.md
 
-1. **SSH连接断开**：使用nohup命令可以确保即使SSH连接断开，测试也会继续在后台运行。
+# 比较热图
+ls experiments/results/figures/ig_standard/
+ls experiments/results/figures/ig_robust/
+```
 
-2. **内存不足**：如果遇到内存问题，可以修改`test_ig_robustness.py`中的批处理大小或减少同时生成的解释数量。
-
-3. **磁盘空间不足**：结果JSON文件和可视化可能会占用大量磁盘空间。如果空间有限，可以考虑禁用可视化保存（删除`--save_viz`参数）。
-
-4. **查看进程是否还在运行**：
-   ```bash
-   ps aux | grep test_ig_robustness
-   ``` 
+您也可以编写额外的Python脚本来直接比较两个JSON结果文件中的指标。 
