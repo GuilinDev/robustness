@@ -184,7 +184,7 @@ class IGRobustnessTest:
                 output = self.model(input_tensor)
                 target_class = torch.argmax(output, dim=1).item()
         else:
-            # 对于健壮模型，同样使用预测的类别
+            # 对于鲁棒模型，同样使用预测的类别
             with torch.no_grad():
                 output = self.model(input_tensor)
                 target_class = torch.argmax(output, dim=1).item()
@@ -324,7 +324,7 @@ class IGRobustnessTest:
         if temp_file and os.path.exists(temp_file):
             with open(temp_file, 'r') as f:
                 results = json.load(f)
-                print(f"Loaded {len(results)} previous results from {temp_file}")
+                print(f"已加载 {len(results)} 个之前的结果从 {temp_file}")
                 
         # 获取图像列表
         image_files = []
@@ -337,7 +337,7 @@ class IGRobustnessTest:
         if test_mode:
             if len(image_files) > test_samples:
                 image_files = image_files[:test_samples]
-            print(f"Test mode: using {len(image_files)} images")
+            print(f"测试模式：使用 {len(image_files)} 张图片")
                 
         # 创建可视化目录（如果需要）
         if save_viz and viz_dir:
@@ -345,14 +345,19 @@ class IGRobustnessTest:
             
         total_images = len(image_files)
         start_time = time.time()
+        total_corruptions = len(self.corruption_types) * 5  # 每种腐蚀5个严重程度级别
+        
+        print(f"开始处理共 {total_images} 张图片，每张图片将测试 {len(self.corruption_types)} 种腐蚀类型，每种类型5个严重程度")
+        print(f"总计需要处理 {total_images * total_corruptions} 个样本点")
         
         # 处理每个图像
         for idx, image_path in enumerate(image_files):
+            image_start_time = time.time()
             if image_path in results:
-                print(f"Skipping already processed image {idx+1}/{total_images}: {image_path}")
+                print(f"跳过已处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
                 continue
                 
-            print(f"Processing image {idx+1}/{total_images}: {image_path}")
+            print(f"\n处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
             try:
                 # 初始化该图像的结果
                 results[image_path] = {}
@@ -368,18 +373,28 @@ class IGRobustnessTest:
                 probs = torch.nn.functional.softmax(output, dim=1).cpu().numpy()[0]
                 pred_class = torch.argmax(output, dim=1).item()
                 
+                print(f"  原始图片预测类别: {pred_class}")
+                
                 # 生成原始图像的IG解释
+                print(f"  生成原始图片的IG解释...")
                 original_explanation = self.generate_ig(input_tensor)
                 
                 # 生成多个IG解释用于稳定性计算
+                print(f"  生成多个解释用于稳定性计算...")
                 original_stability_explanations = self.generate_multiple_igs(input_tensor)
                 
                 # 处理每种腐蚀类型
-                for corruption_type in self.corruption_types:
+                corruption_count = 0
+                for c_idx, corruption_type in enumerate(self.corruption_types):
                     results[image_path][corruption_type] = {"results": []}
+                    print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
                     
                     # 对每个严重程度级别
                     for severity in range(1, 6):
+                        corruption_count += 1
+                        progress = corruption_count / total_corruptions * 100
+                        print(f"    严重程度 {severity}/5 - 当前图片进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
+                        
                         # 应用腐蚀
                         corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
                         corrupted_tensor = self.transform(corrupted_image).unsqueeze(0).to(self.device)
@@ -434,19 +449,25 @@ class IGRobustnessTest:
                 remaining_images = total_images - (idx + 1)
                 est_remaining_time = avg_time_per_image * remaining_images
                 
-                print(f"Completed {idx+1}/{total_images} images.")
-                print(f"Avg time per image: {avg_time_per_image:.2f}s. Est. remaining time: {est_remaining_time/60:.2f} minutes")
+                image_time = time.time() - image_start_time
+                
+                print(f"\n图片 [{idx+1}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
+                print(f"总进度: {idx+1}/{total_images} 图片 ({(idx+1)/total_images*100:.1f}%)")
+                print(f"平均每图片耗时: {avg_time_per_image:.2f}秒")
+                print(f"估计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.1f}小时)")
                     
             except Exception as e:
-                print(f"Error processing {image_path}: {str(e)}")
+                print(f"处理图片 {image_path} 时出错: {str(e)}")
                 continue
                 
         # 保存最终结果
         with open(output_file, 'w') as f:
             json.dump(results, f)
             
-        print(f"Testing completed. Results saved to {output_file}")
-        print(f"Total time: {(time.time() - start_time) / 60:.2f} minutes")
+        total_time = time.time() - start_time
+        print(f"\n测试完成。结果已保存到 {output_file}")
+        print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
+        print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
 
 def main():
     """主函数"""

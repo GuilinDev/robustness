@@ -133,7 +133,7 @@ For best performance on a GPU instance:
 - `analyze_ig_robustness_results.py`: 结果分析脚本，生成报告和可视化
 - `requirements.txt`: 依赖项列表
 - `run_ig_test.sh`: 运行标准模型完整测试的脚本
-- `run_ig_test_robust.sh`: 运行鲁棒模型完整测试的脚本
+- `run_ig_robust_test.sh`: 运行鲁棒模型完整测试的脚本
 - `run_ig_test_local.sh`: 本地测试脚本（仅处理10张图片）
 
 ## 准备工作
