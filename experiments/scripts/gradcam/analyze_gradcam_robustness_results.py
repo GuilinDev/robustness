@@ -94,6 +94,9 @@ class GradCAMRobustnessAnalyzer:
         # 设置水印标记
         watermark = "S" if model_type.lower() == "standard" else "R"
         
+        # 打印当前使用的水印标记，用于调试
+        print(f"Using watermark: {watermark} for model_type: {model_type}")
+        
         # 为每个指标生成热图
         for metric in self.metrics:
             # 如果是stability指标，使用专门的方法处理
@@ -222,6 +225,9 @@ class GradCAMRobustnessAnalyzer:
         """
         # 设置水印标记
         watermark = "S" if model_type.lower() == "standard" else "R"
+        
+        # 打印当前使用的水印标记，用于调试
+        print(f"Using watermark: {watermark} for model_type: {model_type}")
         
         # 收集稳定性数据 - 直接从主结果文件中获取
         stability_data = {}

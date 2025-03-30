@@ -92,6 +92,9 @@ def generate_heatmaps(stats, output_dir, model_type="standard"):
     # 设置水印标记
     watermark = "S" if model_type.lower() == "standard" else "R"
     
+    # 打印当前使用的水印标记，用于调试
+    print(f"Using watermark: {watermark} for model_type: {model_type}")
+    
     # 定义腐蚀类型和指标
     corruption_types = [
         "gaussian_noise", "shot_noise", "impulse_noise", "defocus_blur", 
@@ -167,6 +170,9 @@ def generate_severity_plots(stats, output_dir, model_type="standard"):
     
     # 设置水印标记
     watermark = "S" if model_type.lower() == "standard" else "R"
+    
+    # 打印当前使用的水印标记，用于调试
+    print(f"Using watermark: {watermark} for model_type: {model_type}")
     
     # 定义腐蚀类型和指标
     corruption_types = [
