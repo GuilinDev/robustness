@@ -252,4 +252,34 @@ ls experiments/results/ig_standard_figures/
 ls experiments/results/ig_robust_figures/
 ```
 
-也可以编写额外的Python脚本来直接比较两个JSON结果文件中的指标。 
+也可以编写额外的Python脚本来直接比较两个JSON结果文件中的指标。
+
+## 图表标识说明
+
+生成的热图包含两种重要的标识信息：
+
+1. **标题标识**：每个热图的标题会显示"Integrated Gradients: [指标名称]"，清晰标识这些结果是使用Integrated Gradients方法生成的。
+
+2. **模型类型水印**：每个热图的右下角有一个水印标识：
+   - **S**: 表示使用标准模型 (Standard model) 生成的结果
+   - **R**: 表示使用鲁棒模型 (Robust model) 生成的结果
+
+这样的标识方式能够在比较不同解释方法和不同模型的结果时，快速识别图表来源。
+
+### 运行分析脚本示例
+
+```bash
+# 标准模型分析
+python analyze_ig_robustness_results.py \
+  --results_path experiments/results/ig_robustness_results.json \
+  --figures_dir experiments/results/figures/ig/standard \
+  --report_path experiments/results/ig/standard/analysis_report.md \
+  --model_type standard
+
+# 鲁棒模型分析
+python analyze_ig_robustness_results.py \
+  --results_path experiments/results/ig_robustness_robust_results.json \
+  --figures_dir experiments/results/figures/ig/robust \
+  --report_path experiments/results/ig/robust/analysis_report.md \
+  --model_type robust
+``` 

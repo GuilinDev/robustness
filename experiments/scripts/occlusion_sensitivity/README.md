@@ -160,4 +160,32 @@ bash experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_test.sh
 3. **计算开销**: 通常计算成本较高，尤其是对于高分辨率图像和小步长。
 4. **解释质量**: 通常能够捕捉模型关注的区域，但可能不如基于梯度的方法精细。
 
-推荐根据不同的应用场景和需求选择适合的解释方法。 
+推荐根据不同的应用场景和需求选择适合的解释方法。
+
+## 图表标识说明
+
+生成的热图和折线图包含两种重要的标识信息：
+
+1. **标题标识**：每个热图的标题会显示"Occlusion Sensitivity: [指标名称]"，清晰标识这些结果是使用Occlusion Sensitivity方法生成的。
+
+2. **模型类型水印**：每个图表的右下角有一个水印标识：
+   - **S**: 表示使用标准模型 (Standard model) 生成的结果
+   - **R**: 表示使用鲁棒模型 (Robust model) 生成的结果
+
+这样的标识方式能够在比较不同解释方法和不同模型的结果时，快速识别图表来源。水印使用白色填充和黑色边框设计，确保在任何背景颜色下都清晰可见，不会被热图或折线图的颜色遮挡。
+
+### 运行分析脚本示例
+
+```bash
+# 标准模型分析
+python experiments/scripts/occlusion_sensitivity/analyze_occlusion_sensitivity_robustness_results.py \
+  --results_file experiments/results/occlusion_sensitivity_robustness_results.json \
+  --output_dir experiments/results/figures/occlusion_sensitivity/standard \
+  --model_type standard
+
+# 鲁棒模型分析
+python experiments/scripts/occlusion_sensitivity/analyze_occlusion_sensitivity_robustness_results.py \
+  --results_file experiments/results/occlusion_sensitivity_robustness_robust_results.json \
+  --output_dir experiments/results/figures/occlusion_sensitivity/robust \
+  --model_type robust
+``` 

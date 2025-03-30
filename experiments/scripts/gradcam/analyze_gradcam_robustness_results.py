@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 from typing import Dict
 import os
 import argparse
@@ -80,20 +81,24 @@ class GradCAMRobustnessAnalyzer:
                         data.append(row)
         return pd.DataFrame(data)
 
-    def plot_metric_heatmaps(self, output_dir: str):
+    def plot_metric_heatmaps(self, output_dir: str, model_type: str = "standard"):
         """为每个指标生成热图，横轴为噪声类型，纵轴为严重程度
         
         Args:
             output_dir: 输出目录
+            model_type: 模型类型，'standard'或'robust'
         """
         os.makedirs(output_dir, exist_ok=True)
         df = self._create_dataframe()
+        
+        # 设置水印标记
+        watermark = "S" if model_type.lower() == "standard" else "R"
         
         # 为每个指标生成热图
         for metric in self.metrics:
             # 如果是stability指标，使用专门的方法处理
             if metric == 'stability':
-                self._plot_stability_chart(output_dir)
+                self._plot_stability_chart(output_dir, model_type)
                 continue
                 
             # 计算每个噪声类型和严重程度的平均值
@@ -135,10 +140,13 @@ class GradCAMRobustnessAnalyzer:
             metric_title = self.metric_names[metric]
             plt.title(f"GradCAM: {metric_title} by Corruption Type and Severity", fontsize=14, fontweight='bold')
             
-            # 添加水印标识
-            plt.text(0.98, 0.02, "GC", transform=plt.gca().transAxes, 
-                     fontsize=18, color='gray', alpha=0.3, 
-                     ha='right', va='bottom', fontweight='bold')
+            # 添加水印标识模型类型
+            plt.text(0.99, 0.01, watermark, transform=plt.gca().transAxes, 
+                     fontsize=20, color='white', fontweight='bold',
+                     ha='right', va='bottom', 
+                     path_effects=[
+                         path_effects.withStroke(linewidth=3, foreground='black')
+                     ])
             
             plt.xticks(rotation=45, ha='right', fontsize=8)
             plt.yticks(fontsize=10)
@@ -205,12 +213,16 @@ class GradCAMRobustnessAnalyzer:
                     line += f" {row[col_name]:.3f} |"
                 f.write(line + "\n")
 
-    def _plot_stability_chart(self, output_dir: str):
+    def _plot_stability_chart(self, output_dir: str, model_type: str = "standard"):
         """为稳定性指标生成热图
         
         Args:
             output_dir: 输出目录
+            model_type: 模型类型，'standard'或'robust'
         """
+        # 设置水印标记
+        watermark = "S" if model_type.lower() == "standard" else "R"
+        
         # 收集稳定性数据 - 直接从主结果文件中获取
         stability_data = {}
         processed_images = set()
@@ -283,56 +295,64 @@ class GradCAMRobustnessAnalyzer:
             cbar_kws={'label': 'stability', 'shrink': 0.5}
         )
         
-        plt.title(f"{self.metric_names['stability']} by Corruption Type and Severity", fontsize=12)
+        plt.title(f"GradCAM: {self.metric_names['stability']} by Corruption Type and Severity", fontsize=14, fontweight='bold')
         plt.xticks(rotation=45, ha='right', fontsize=8)
         plt.yticks(fontsize=10)
+        
+        # 添加水印标识模型类型
+        plt.text(0.99, 0.01, watermark, transform=plt.gca().transAxes, 
+                 fontsize=20, color='white', fontweight='bold',
+                 ha='right', va='bottom', 
+                 path_effects=[
+                     path_effects.withStroke(linewidth=3, foreground='black')
+                 ])
         
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, 'stability_heatmap.png'), bbox_inches='tight', dpi=300)
         plt.close()
 
-    def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3):
+    def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3, model_type: str = "standard"):
         """运行分析流程
         
         Args:
             figures_dir: 图表输出目录
             report_path: 报告输出路径
             severity_level: 报告中使用的严重程度级别
+            model_type: 模型类型，'standard'或'robust'
         """
         # 生成热图
-        self.plot_metric_heatmaps(figures_dir)
+        self.plot_metric_heatmaps(figures_dir, model_type)
         
         # 生成报告表格
         self.generate_report_table(report_path, severity_level)
         
-        # 生成稳定性热图 (现在由plot_metric_heatmaps统一处理，如果需要单独逻辑再取消注释)
-        # self._plot_stability_chart(figures_dir) # 之前 plot_metric_heatmaps 会跳过 stability
-        
-        print(f"分析完成。热图保存在: {figures_dir}")
-        print(f"报告保存为: {report_path}")
+        # 打印完成信息
+        print(f"Analysis completed. Heatmaps saved in: {figures_dir}")
+        print(f"Report saved as: {report_path}")
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='Analyze GradCAM robustness results.')
-    parser.add_argument('--results_path', type=str, 
-                        default='experiments/results/gradcam_robustness_results.json', 
-                        help='Path to the GradCAM results JSON file.')
-    parser.add_argument('--figures_dir', type=str, 
-                        default='experiments/results/figures', 
-                        help='Directory to save the heatmap figures.')
-    parser.add_argument('--report_path', type=str, 
-                        default='experiments/results/analysis_report.md', 
-                        help='Path to save the analysis report.')
-    parser.add_argument('--severity_level', type=int, default=3, 
-                        help='Severity level to focus on in the report (1-5).')
-
+    parser = argparse.ArgumentParser(description='Analyze GradCAM robustness test results')
+    parser.add_argument('--results_path', type=str, required=True, 
+                        help='Path to the GradCAM robustness results JSON file')
+    parser.add_argument('--figures_dir', type=str, required=True,
+                        help='Directory to save the generated figures')
+    parser.add_argument('--report_path', type=str, required=True,
+                        help='Path to save the analysis report')
+    parser.add_argument('--severity_level', type=int, default=3, choices=[1, 2, 3, 4, 5],
+                        help='Severity level to use for the report (1-5)')
+    parser.add_argument('--model_type', type=str, default='standard', choices=['standard', 'robust'],
+                        help='Model type (standard or robust) for proper labeling')
+    
     args = parser.parse_args()
     
-    # 使用命令行参数创建分析器实例
-    analyzer = GradCAMRobustnessAnalyzer(args.results_path)
+    # 创建输出目录
+    os.makedirs(args.figures_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(args.report_path), exist_ok=True)
     
-    # 使用命令行参数运行分析
-    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level)
+    # 运行分析
+    analyzer = GradCAMRobustnessAnalyzer(args.results_path)
+    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level, args.model_type)
 
 if __name__ == "__main__":
     main() 

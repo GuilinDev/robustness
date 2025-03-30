@@ -100,4 +100,34 @@ nohup bash experiments/scripts/lime/run_lime_test.sh > lime_standard_log.out 2>&
 
 ```bash
 tail -f lime_standard_log.out
+```
+
+## 图表标识说明
+
+生成的热图包含两种重要的标识信息：
+
+1. **标题标识**：每个热图的标题会显示"LIME: [指标名称]"，清晰标识这些结果是使用LIME方法生成的。
+
+2. **模型类型水印**：每个热图的右下角有一个水印标识：
+   - **S**: 表示使用标准模型 (Standard model) 生成的结果
+   - **R**: 表示使用鲁棒模型 (Robust model) 生成的结果
+
+这样的标识方式能够在比较不同解释方法和不同模型的结果时，快速识别图表来源。水印使用白色填充和黑色边框设计，确保在任何背景颜色下都清晰可见。
+
+### 运行分析脚本示例
+
+```bash
+# 标准模型分析
+python experiments/scripts/lime/analyze_lime_robustness_results.py \
+  --results_path experiments/results/lime_robustness_results.json \
+  --figures_dir experiments/results/figures/lime/standard \
+  --report_path experiments/results/lime/standard/analysis_report.md \
+  --model_type standard
+
+# 鲁棒模型分析
+python experiments/scripts/lime/analyze_lime_robustness_results.py \
+  --results_path experiments/results/lime_robustness_robust_results.json \
+  --figures_dir experiments/results/figures/lime/robust \
+  --report_path experiments/results/lime/robust/analysis_report.md \
+  --model_type robust
 ``` 

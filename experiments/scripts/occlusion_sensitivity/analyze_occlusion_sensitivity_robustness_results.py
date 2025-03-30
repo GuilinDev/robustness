@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 import seaborn as sns
 from collections import defaultdict
 
@@ -78,9 +79,18 @@ def calculate_statistics(metrics_data, stability_data):
     
     return stats
 
-def generate_heatmaps(stats, output_dir):
-    """生成热图来可视化指标随腐蚀类型和严重程度的变化"""
+def generate_heatmaps(stats, output_dir, model_type="standard"):
+    """生成热图来可视化指标随腐蚀类型和严重程度的变化
+    
+    Args:
+        stats: 统计数据字典
+        output_dir: 输出目录路径
+        model_type: 模型类型，'standard'或'robust'
+    """
     os.makedirs(output_dir, exist_ok=True)
+    
+    # 设置水印标记
+    watermark = "S" if model_type.lower() == "standard" else "R"
     
     # 定义腐蚀类型和指标
     corruption_types = [
@@ -132,19 +142,31 @@ def generate_heatmaps(stats, output_dir):
         plt.ylabel("Corruption Type")
         plt.xlabel("Severity Level")
         
-        # 添加水印标识
-        plt.text(0.98, 0.02, "OS", transform=plt.gca().transAxes, 
-                 fontsize=18, color='gray', alpha=0.3, 
-                 ha='right', va='bottom', fontweight='bold')
+        # 添加水印标识模型类型
+        plt.text(0.99, 0.01, watermark, transform=plt.gca().transAxes, 
+                 fontsize=20, color='white', fontweight='bold',
+                 ha='right', va='bottom', 
+                 path_effects=[
+                     path_effects.withStroke(linewidth=3, foreground='black')
+                 ])
         
         # 保存热图
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f"heatmap_{metric}.png"), dpi=300)
         plt.close()
 
-def generate_severity_plots(stats, output_dir):
-    """生成折线图显示指标如何随严重程度变化"""
+def generate_severity_plots(stats, output_dir, model_type="standard"):
+    """生成折线图显示指标如何随严重程度变化
+    
+    Args:
+        stats: 统计数据字典
+        output_dir: 输出目录路径
+        model_type: 模型类型，'standard'或'robust'
+    """
     os.makedirs(output_dir, exist_ok=True)
+    
+    # 设置水印标记
+    watermark = "S" if model_type.lower() == "standard" else "R"
     
     # 定义腐蚀类型和指标
     corruption_types = [
@@ -187,10 +209,13 @@ def generate_severity_plots(stats, output_dir):
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         
-        # 添加水印标识
-        plt.text(0.98, 0.02, "OS", transform=plt.gca().transAxes, 
-                 fontsize=18, color='gray', alpha=0.3, 
-                 ha='right', va='bottom', fontweight='bold')
+        # 添加水印标识模型类型
+        plt.text(0.99, 0.01, watermark, transform=plt.gca().transAxes, 
+                 fontsize=20, color='white', fontweight='bold',
+                 ha='right', va='bottom', 
+                 path_effects=[
+                     path_effects.withStroke(linewidth=3, foreground='black')
+                 ])
         
         # 保存图表
         plt.tight_layout()
@@ -260,6 +285,8 @@ def main():
     parser = argparse.ArgumentParser(description="分析Occlusion Sensitivity鲁棒性测试结果")
     parser.add_argument('--results_file', type=str, required=True, help="测试结果文件的路径")
     parser.add_argument('--output_dir', type=str, required=True, help="输出目录的路径")
+    parser.add_argument('--model_type', type=str, default='standard', choices=['standard', 'robust'],
+                        help="模型类型 (standard或robust) 用于正确标记")
     
     args = parser.parse_args()
     
@@ -280,11 +307,11 @@ def main():
     
     # 生成热图
     print("生成热图...")
-    generate_heatmaps(stats, args.output_dir)
+    generate_heatmaps(stats, args.output_dir, args.model_type)
     
     # 生成严重程度折线图
     print("生成严重程度折线图...")
-    generate_severity_plots(stats, args.output_dir)
+    generate_severity_plots(stats, args.output_dir, args.model_type)
     
     # 生成摘要报告
     print("生成摘要报告...")

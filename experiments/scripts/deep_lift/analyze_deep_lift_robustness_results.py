@@ -3,8 +3,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 from typing import Dict
 import os
+import argparse
 
 # 设置matplotlib和seaborn样式
 sns.set_style("whitegrid")
@@ -79,14 +81,18 @@ class DeepLIFTRobustnessAnalyzer:
                         data.append(row)
         return pd.DataFrame(data)
 
-    def plot_metric_heatmaps(self, output_dir: str):
+    def plot_metric_heatmaps(self, output_dir: str, model_type: str = "standard"):
         """为每个指标生成热图，横轴为噪声类型，纵轴为严重程度
         
         Args:
             output_dir: 输出目录
+            model_type: 模型类型，'standard'或'robust'
         """
         os.makedirs(output_dir, exist_ok=True)
         df = self._create_dataframe()
+        
+        # 设置水印标记
+        watermark = "S" if model_type.lower() == "standard" else "R"
         
         # 为每个指标生成热图
         for metric in self.metrics:
@@ -129,10 +135,13 @@ class DeepLIFTRobustnessAnalyzer:
             metric_title = self.metric_names[metric]
             plt.title(f"DeepLIFT: {metric_title} by Corruption Type and Severity", fontsize=14, fontweight='bold')
             
-            # 添加水印标识
-            plt.text(0.98, 0.02, "DL", transform=plt.gca().transAxes, 
-                     fontsize=18, color='gray', alpha=0.3, 
-                     ha='right', va='bottom', fontweight='bold')
+            # 添加水印标识模型类型
+            plt.text(0.99, 0.01, watermark, transform=plt.gca().transAxes, 
+                     fontsize=20, color='white', fontweight='bold',
+                     ha='right', va='bottom', 
+                     path_effects=[
+                         path_effects.withStroke(linewidth=3, foreground='black')
+                     ])
             
             plt.xticks(rotation=45, ha='right', fontsize=8)
             plt.yticks(fontsize=10)
@@ -306,16 +315,17 @@ class DeepLIFTRobustnessAnalyzer:
                 most_correlated = sorted_correlations[0]
                 f.write(f"4. The metric most correlated with accuracy is {most_correlated[0]} (correlation: {most_correlated[1]:.3f})\n")
 
-    def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3):
+    def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3, model_type: str = "standard"):
         """运行分析流程
         
         Args:
             figures_dir: 图表输出目录
             report_path: 报告输出路径
             severity_level: 报告中使用的严重程度级别
+            model_type: 模型类型，'standard'或'robust'
         """
         # 生成热图
-        self.plot_metric_heatmaps(figures_dir)
+        self.plot_metric_heatmaps(figures_dir, model_type)
         
         # 生成报告表格
         self.generate_report_table(report_path, severity_level)
@@ -326,17 +336,17 @@ class DeepLIFTRobustnessAnalyzer:
 
 def main():
     """主函数"""
-    import argparse
-    
     parser = argparse.ArgumentParser(description='Analyze DeepLIFT robustness test results')
-    parser.add_argument('--results_path', type=str, default='experiments/results/deep_lift_robustness_results.json',
+    parser.add_argument('--results_path', type=str, required=True,
                        help='Path to the DeepLIFT robustness results JSON file')
-    parser.add_argument('--figures_dir', type=str, default='experiments/results/figures/deep_lift',
+    parser.add_argument('--figures_dir', type=str, required=True,
                        help='Directory to save the generated figures')
-    parser.add_argument('--report_path', type=str, default='experiments/results/deep_lift_analysis_report.md',
+    parser.add_argument('--report_path', type=str, required=True,
                        help='Path to save the analysis report')
     parser.add_argument('--severity_level', type=int, default=3, choices=[1, 2, 3, 4, 5],
                        help='Severity level to use for the report (1-5)')
+    parser.add_argument('--model_type', type=str, default='standard', choices=['standard', 'robust'],
+                       help='Model type (standard or robust) for proper labeling')
     
     args = parser.parse_args()
     
@@ -346,7 +356,7 @@ def main():
     
     # 运行分析
     analyzer = DeepLIFTRobustnessAnalyzer(args.results_path)
-    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level)
+    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level, args.model_type)
 
 if __name__ == "__main__":
     main() 
