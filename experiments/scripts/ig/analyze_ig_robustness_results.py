@@ -94,6 +94,9 @@ class IGRobustnessAnalyzer:
         # 设置水印标记
         watermark = "S" if model_type.lower() == "standard" else "R"
         
+        # 打印当前使用的水印标记，用于调试
+        print(f"Using watermark: {watermark} for model_type: {model_type}")
+        
         # 为每个指标生成热图
         for metric in self.metrics:
             # 计算每个噪声类型和严重程度的平均值
@@ -316,14 +319,20 @@ class IGRobustnessAnalyzer:
                 f.write(f"4. The metric most correlated with accuracy is {most_correlated[0]} (correlation: {most_correlated[1]:.3f})\n")
 
     def run_analysis(self, figures_dir: str, report_path: str, severity_level: int = 3, model_type: str = "standard"):
-        """运行分析流程
+        """运行分析，生成热图和报告
         
         Args:
-            figures_dir: 图表输出目录
-            report_path: 报告输出路径
-            severity_level: 报告中使用的严重程度级别
+            figures_dir: 输出图片的目录
+            report_path: 报告文件的路径
+            severity_level: 报告中要分析的严重程度（1-5）
             model_type: 模型类型，'standard'或'robust'
         """
+        # 打印开始信息
+        print(f"Starting analysis for model type: {model_type}")
+        print(f"Results path: {self.results_path}")
+        print(f"Figures will be saved to: {figures_dir}")
+        print(f"Report will be saved to: {report_path}")
+        
         # 生成热图
         self.plot_metric_heatmaps(figures_dir, model_type)
         
@@ -353,6 +362,14 @@ def main():
     # 创建输出目录
     os.makedirs(args.figures_dir, exist_ok=True)
     os.makedirs(os.path.dirname(args.report_path), exist_ok=True)
+    
+    # 打印参数信息
+    print(f"Parameters:")
+    print(f"- Model type: {args.model_type}")
+    print(f"- Results path: {args.results_path}")
+    print(f"- Figures directory: {args.figures_dir}")
+    print(f"- Report path: {args.report_path}")
+    print(f"- Severity level: {args.severity_level}")
     
     # 运行分析
     analyzer = IGRobustnessAnalyzer(args.results_path)
