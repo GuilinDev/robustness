@@ -128,9 +128,14 @@ def generate_heatmaps(stats, output_dir):
         
         # 设置标题和标签
         metric_name = metric.replace("_", " ").title()
-        plt.title(f"Occlusion Sensitivity: {metric_name} vs Corruption Type and Severity")
+        plt.title(f"Occlusion Sensitivity: {metric_name} vs Corruption Type and Severity", fontsize=14, fontweight='bold')
         plt.ylabel("Corruption Type")
         plt.xlabel("Severity Level")
+        
+        # 添加水印标识
+        plt.text(0.98, 0.02, "OS", transform=plt.gca().transAxes, 
+                 fontsize=18, color='gray', alpha=0.3, 
+                 ha='right', va='bottom', fontweight='bold')
         
         # 保存热图
         plt.tight_layout()
@@ -176,11 +181,16 @@ def generate_severity_plots(stats, output_dir):
         
         # 设置图表
         metric_name = metric.replace("_", " ").title()
-        plt.title(f"Occlusion Sensitivity: {metric_name} vs Severity Level")
+        plt.title(f"Occlusion Sensitivity: {metric_name} vs Severity Level", fontsize=14, fontweight='bold')
         plt.xlabel("Severity Level")
         plt.ylabel(metric_name)
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # 添加水印标识
+        plt.text(0.98, 0.02, "OS", transform=plt.gca().transAxes, 
+                 fontsize=18, color='gray', alpha=0.3, 
+                 ha='right', va='bottom', fontweight='bold')
         
         # 保存图表
         plt.tight_layout()

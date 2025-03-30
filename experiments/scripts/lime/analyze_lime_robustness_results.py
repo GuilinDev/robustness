@@ -114,7 +114,7 @@ class LIMERobustnessAnalyzer:
             # 设置热图参数
             plt.figure(figsize=(12, 6))
             
-            # 绘制热图，所有指标使用相同的设置
+            # 绘制热图
             sns.heatmap(
                 heatmap_df,
                 annot=True,
@@ -125,8 +125,15 @@ class LIMERobustnessAnalyzer:
                 cbar_kws={'label': metric, 'shrink': 0.5}
             )
             
-            # 调整标题和标签
-            plt.title(f"{self.metric_names[metric]} by Corruption Type and Severity", fontsize=12)
+            # 添加清晰的方法标识
+            metric_title = self.metric_names[metric]
+            plt.title(f"LIME: {metric_title} by Corruption Type and Severity", fontsize=14, fontweight='bold')
+            
+            # 添加水印标识
+            plt.text(0.98, 0.02, "LIME", transform=plt.gca().transAxes, 
+                     fontsize=18, color='gray', alpha=0.3, 
+                     ha='right', va='bottom', fontweight='bold')
+            
             plt.xticks(rotation=45, ha='right', fontsize=8)
             plt.yticks(fontsize=10)
             
