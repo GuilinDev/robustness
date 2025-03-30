@@ -463,7 +463,6 @@ class DeepLIFTRobustnessTest:
                 
                 # 计算处理该图像的时间
                 image_time = time.time() - image_start_time
-                print(f"  图片处理完成，耗时: {image_time:.2f}秒")
                 
                 # 估计剩余时间
                 elapsed_time = time.time() - start_time
@@ -473,9 +472,10 @@ class DeepLIFTRobustnessTest:
                     remaining_images = total_images - images_processed
                     est_remaining_time = remaining_images * avg_time_per_image
                     
-                    print(f"  已处理: {images_processed}/{total_images} 张图片")
-                    print(f"  已用时间: {elapsed_time/60:.2f}分钟")
-                    print(f"  预计剩余时间: {est_remaining_time/60:.2f}分钟")
+                    print(f"\n图片 [{images_processed}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
+                    print(f"总进度: {images_processed}/{total_images} 图片 ({images_processed/total_images*100:.1f}%)")
+                    print(f"平均每图片耗时: {avg_time_per_image:.2f}秒")
+                    print(f"估计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.1f}小时)")
                     
             except Exception as e:
                 print(f"处理图片 {image_path} 时出错: {str(e)}")
@@ -485,8 +485,10 @@ class DeepLIFTRobustnessTest:
         with open(output_file, 'w') as f:
             json.dump(results, f)
             
+        total_time = time.time() - start_time
         print(f"\n测试完成! 结果已保存到 {output_file}")
-        print(f"总处理时间: {(time.time() - start_time)/60:.2f}分钟")
+        print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
+        print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
 
 def main():
     parser = argparse.ArgumentParser(description="测试DeepLIFT解释的鲁棒性")
