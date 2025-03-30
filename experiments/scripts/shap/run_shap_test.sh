@@ -138,7 +138,7 @@ else
 fi
 
 # 运行SHAP测试
-echo "开始SHAP稳健性测试，使用标准模型..."
+echo "开始SHAP鲁棒性测试，使用标准模型..."
 echo "图像目录: $IMAGE_DIR"
 echo "结果将保存到: $RESULTS_FILE"
 
@@ -199,7 +199,7 @@ if [ "$OPTIMIZE" = true ] && [ $N_STEPS -gt 0 ]; then
   rm $SCRIPT_PATH
 fi
 
-echo "SHAP稳健性测试（标准模型）已完成!"
+echo "SHAP鲁棒性测试（标准模型）已完成!"
 echo "结果已保存到 $RESULTS_FILE"
 echo "分析报告已保存到 $REPORT_PATH"
 echo "热图已保存到 $FIGURES_DIR" 
