@@ -183,8 +183,8 @@ class SHAPRobustnessTest:
             output = self.model(input_tensor)
             target_class = torch.argmax(output, dim=1).item()
         
-        # 计算SHAP值
-        shap_values = self.explainer.shap_values(input_tensor, nsamples=10)
+        # 计算SHAP值 - 使用更少的样本数来提高性能
+        shap_values = self.explainer.shap_values(input_tensor, nsamples=3)
         
         # 如果shap_values是list类型，取对应预测类别的值
         if isinstance(shap_values, list):
@@ -343,11 +343,18 @@ class SHAPRobustnessTest:
         print(f"开始处理共 {total_images} 张图片，每张图片将测试 {len(self.corruption_types)} 种腐蚀类型，每种类型5个严重程度")
         print(f"总计需要处理 {total_images * total_corruptions} 个样本点")
         
+        # 统计进度变量
+        completed_images = 0
+        total_corruption_points = 0
+        last_update_time = time.time()
+        update_interval = 60  # 每分钟更新一次进度
+        
         # 处理每个图像
         for idx, image_path in enumerate(image_files):
             image_start_time = time.time()
             if image_path in results:
                 print(f"跳过已处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
+                completed_images += 1
                 continue
                 
             print(f"\n处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
@@ -374,19 +381,26 @@ class SHAPRobustnessTest:
                 
                 # 生成多个SHAP解释用于稳定性计算
                 print(f"  生成多个解释用于稳定性计算...")
-                original_stability_explanations = self.generate_multiple_shaps(input_tensor)
+                original_stability_explanations = self.generate_multiple_shaps(input_tensor, n_samples=3)
                 
                 # 处理每种腐蚀类型
                 corruption_count = 0
                 for c_idx, corruption_type in enumerate(self.corruption_types):
                     results[image_path][corruption_type] = {"results": []}
-                    print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
+                    
+                    # 减少输出频率，仅显示进度
+                    if c_idx == 0 or c_idx == len(self.corruption_types) - 1:
+                        print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
                     
                     # 对每个严重程度级别
                     for severity in range(1, 6):
                         corruption_count += 1
-                        progress = corruption_count / total_corruptions * 100
-                        print(f"    严重程度 {severity}/5 - 当前图片进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
+                        total_corruption_points += 1
+                        
+                        # 减少输出频率，只打印第一个和最后一个严重度的进度
+                        if (c_idx == 0 or c_idx == len(self.corruption_types) - 1) and (severity == 1 or severity == 5):
+                            progress = corruption_count / total_corruptions * 100
+                            print(f"    严重程度 {severity}/5 - 当前图片进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
                         
                         # 应用腐蚀
                         corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
@@ -402,8 +416,8 @@ class SHAPRobustnessTest:
                         # 生成腐蚀后图像的SHAP解释
                         corrupted_explanation = self.generate_shap(corrupted_tensor)
                         
-                        # 生成多个SHAP解释用于稳定性计算
-                        corrupted_stability_explanations = self.generate_multiple_shaps(corrupted_tensor)
+                        # 生成多个SHAP解释用于稳定性计算 - 减少样本数
+                        corrupted_stability_explanations = self.generate_multiple_shaps(corrupted_tensor, n_samples=3)
                         
                         # 计算指标
                         metrics = self.compute_metrics(
@@ -422,8 +436,8 @@ class SHAPRobustnessTest:
                         # 保存到结果
                         results[image_path][corruption_type]["results"].append(metrics)
                         
-                        # 保存可视化（如果需要）
-                        if save_viz and viz_dir:
+                        # 保存可视化（如果需要）- 减少可视化数量，只保存中等严重度的
+                        if save_viz and viz_dir and severity == 3:
                             viz_filename = f"{os.path.basename(image_path).split('.')[0]}_{corruption_type}_s{severity}.png"
                             viz_path = os.path.join(viz_dir, viz_filename)
                             self.save_visualization(
@@ -431,38 +445,42 @@ class SHAPRobustnessTest:
                                 original_explanation, corrupted_explanation,
                                 viz_path, corruption_type, severity
                             )
-                            
-                        # 保存临时结果
-                        if temp_file:
-                            with open(temp_file, 'w') as f:
-                                json.dump(results, f)
                 
-                # 计算处理该图像的时间
-                image_time = time.time() - image_start_time
-                
-                # 估计剩余时间
-                elapsed_time = time.time() - start_time
-                images_processed = idx + 1
-                if images_processed > 0:
-                    avg_time_per_image = elapsed_time / images_processed
-                    remaining_images = total_images - images_processed
-                    est_remaining_time = remaining_images * avg_time_per_image
+                # 定期保存临时结果，而不是每完成一张图像都保存
+                current_time = time.time()
+                if temp_file and (current_time - last_update_time > update_interval):
+                    with open(temp_file, 'w') as f:
+                        json.dump(results, f)
+                    last_update_time = current_time
                     
-                    print(f"\n图片 [{images_processed}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
-                    print(f"总进度: {images_processed}/{total_images} 图片 ({images_processed/total_images*100:.1f}%)")
+                    # 输出详细的进度信息
+                    elapsed_time = time.time() - start_time
+                    completed_images += 1
+                    avg_time_per_image = elapsed_time / completed_images
+                    remaining_images = total_images - completed_images
+                    est_remaining_time = avg_time_per_image * remaining_images
+                    
+                    print(f"\n===== 进度更新 =====")
+                    print(f"已完成: {completed_images}/{total_images} 图片 ({completed_images/total_images*100:.1f}%)")
+                    print(f"已处理: {total_corruption_points}/{total_images * total_corruptions} 腐蚀点 ({total_corruption_points/(total_images * total_corruptions)*100:.1f}%)")
                     print(f"平均每图片耗时: {avg_time_per_image:.2f}秒")
                     print(f"估计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.1f}小时)")
+                    print(f"===== 进度更新结束 =====\n")
+                
+                completed_images += 1
+                image_time = time.time() - image_start_time
+                print(f"\n图片 [{idx+1}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
                     
             except Exception as e:
                 print(f"处理图片 {image_path} 时出错: {str(e)}")
                 continue
-        
+                
         # 保存最终结果
         with open(output_file, 'w') as f:
             json.dump(results, f)
             
         total_time = time.time() - start_time
-        print(f"\n测试完成! 结果已保存到 {output_file}")
+        print(f"\n测试完成。结果已保存到 {output_file}")
         print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
         print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
 
