@@ -8,6 +8,7 @@ from torchvision import transforms
 import cv2
 import time
 import argparse
+import gc  # 导入垃圾回收模块
 from typing import Dict, List, Tuple, Optional
 from scipy.ndimage import zoom, map_coordinates
 from skimage.filters import gaussian
@@ -323,7 +324,7 @@ class SHAPRobustnessTest:
         image_files = []
         for root, _, files in os.walk(image_dir):
             for file in files:
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.JPEG')):
                     image_files.append(os.path.join(root, file))
         
         # 如果是测试模式，则只使用指定数量的样本
@@ -344,20 +345,35 @@ class SHAPRobustnessTest:
         print(f"总计需要处理 {total_images * total_corruptions} 个样本点")
         
         # 统计进度变量
-        completed_images = 0
+        completed_images = sum(1 for img in image_files if img in results)
         total_corruption_points = 0
         last_update_time = time.time()
-        update_interval = 60  # 每分钟更新一次进度
+        update_interval = 10  # 每10秒更新一次进度，而不是原来的60秒
+        
+        # 输出初始进度
+        if completed_images > 0:
+            print(f"已找到 {completed_images}/{total_images} 张已处理图片，将继续处理剩余图片")
         
         # 处理每个图像
         for idx, image_path in enumerate(image_files):
             image_start_time = time.time()
             if image_path in results:
                 print(f"跳过已处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
-                completed_images += 1
                 continue
                 
-            print(f"\n处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
+            # 更详细的进度显示
+            progress = (idx + 1) / total_images * 100
+            elapsed_time = time.time() - start_time
+            est_time_per_image = elapsed_time / (idx + 1 - completed_images) if (idx - completed_images) > 0 else 0
+            remaining_images = total_images - (idx + 1)
+            est_remaining_time = est_time_per_image * remaining_images
+            
+            print(f"\n========== 图片进度 {idx+1}/{total_images} ({progress:.1f}%) ==========")
+            print(f"当前处理: {os.path.basename(image_path)}")
+            print(f"已耗时: {elapsed_time/60:.1f}分钟")
+            print(f"预计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.2f}小时)")
+            print(f"平均每图片耗时: {est_time_per_image:.1f}秒")
+
             try:
                 # 初始化该图像的结果
                 results[image_path] = {}
@@ -388,19 +404,18 @@ class SHAPRobustnessTest:
                 for c_idx, corruption_type in enumerate(self.corruption_types):
                     results[image_path][corruption_type] = {"results": []}
                     
-                    # 减少输出频率，仅显示进度
-                    if c_idx == 0 or c_idx == len(self.corruption_types) - 1:
-                        print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
+                    # 显示进度更新 - 始终显示当前腐蚀类型
+                    print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
+                    sub_start_time = time.time()
                     
                     # 对每个严重程度级别
                     for severity in range(1, 6):
                         corruption_count += 1
                         total_corruption_points += 1
                         
-                        # 减少输出频率，只打印第一个和最后一个严重度的进度
-                        if (c_idx == 0 or c_idx == len(self.corruption_types) - 1) and (severity == 1 or severity == 5):
-                            progress = corruption_count / total_corruptions * 100
-                            print(f"    严重程度 {severity}/5 - 当前图片进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
+                        # 更详细的腐蚀进度 - 始终显示当前严重度
+                        progress = corruption_count / total_corruptions * 100
+                        print(f"    严重程度 {severity}/5 - 进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
                         
                         # 应用腐蚀
                         corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
@@ -445,34 +460,46 @@ class SHAPRobustnessTest:
                                 original_explanation, corrupted_explanation,
                                 viz_path, corruption_type, severity
                             )
+                    
+                    # 显示每种腐蚀类型完成的进度
+                    sub_time = time.time() - sub_start_time
+                    print(f"    完成腐蚀类型 {corruption_type}，耗时: {sub_time:.1f}秒")
+                    
+                    # 在每个腐蚀类型完成后保存临时结果，而不是等待更新间隔
+                    if temp_file:
+                        with open(temp_file, 'w') as f:
+                            json.dump(results, f)
+                        print(f"    临时结果已保存至 {temp_file}")
+                    
+                    # 清理内存
+                    torch.cuda.empty_cache()
+                    gc.collect()
                 
-                # 定期保存临时结果，而不是每完成一张图像都保存
-                current_time = time.time()
-                if temp_file and (current_time - last_update_time > update_interval):
+                # 每张图片处理完成后必定保存一次结果
+                if temp_file:
                     with open(temp_file, 'w') as f:
                         json.dump(results, f)
-                    last_update_time = current_time
-                    
-                    # 输出详细的进度信息
-                    elapsed_time = time.time() - start_time
-                    completed_images += 1
-                    avg_time_per_image = elapsed_time / completed_images
-                    remaining_images = total_images - completed_images
-                    est_remaining_time = avg_time_per_image * remaining_images
-                    
-                    print(f"\n===== 进度更新 =====")
-                    print(f"已完成: {completed_images}/{total_images} 图片 ({completed_images/total_images*100:.1f}%)")
-                    print(f"已处理: {total_corruption_points}/{total_images * total_corruptions} 腐蚀点 ({total_corruption_points/(total_images * total_corruptions)*100:.1f}%)")
-                    print(f"平均每图片耗时: {avg_time_per_image:.2f}秒")
-                    print(f"估计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.1f}小时)")
-                    print(f"===== 进度更新结束 =====\n")
                 
-                completed_images += 1
+                # 图片处理完成信息
                 image_time = time.time() - image_start_time
-                print(f"\n图片 [{idx+1}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
+                completed_images += 1
+                avg_time_per_image = (time.time() - start_time) / completed_images
+                remaining_images = total_images - completed_images
+                est_remaining_time = avg_time_per_image * remaining_images
+                
+                print(f"\n图片 [{idx+1}/{total_images}] 处理完成")
+                print(f"耗时: {image_time:.2f}秒")
+                print(f"处理进度: {completed_images}/{total_images} ({completed_images/total_images*100:.1f}%)")
+                print(f"平均每图片耗时: {avg_time_per_image:.1f}秒")
+                print(f"预计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.2f}小时)")
+                print("=" * 50)
                     
             except Exception as e:
                 print(f"处理图片 {image_path} 时出错: {str(e)}")
+                # 发生错误也保存当前结果
+                if temp_file:
+                    with open(temp_file, 'w') as f:
+                        json.dump(results, f)
                 continue
                 
         # 保存最终结果
@@ -481,8 +508,11 @@ class SHAPRobustnessTest:
             
         total_time = time.time() - start_time
         print(f"\n测试完成。结果已保存到 {output_file}")
-        print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
+        print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.2f}小时)")
         print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
+        print(f"总共处理图片: {completed_images}/{total_images}")
+        print(f"总共处理腐蚀点: {total_corruption_points}/{total_images * total_corruptions}")
+        print("=" * 50)
 
 def main():
     parser = argparse.ArgumentParser(description="测试SHAP解释的鲁棒性")
