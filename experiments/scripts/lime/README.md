@@ -88,6 +88,16 @@ python experiments/scripts/lime/analyze_lime_robustness_results.py \
 2. 使用`--test`选项运行测试模式，仅处理20张图像
 3. 在具有更多RAM的计算机上运行测试
 
+### `bc: command not found` 错误
+
+运行 `run_lime_test.sh` 或 `run_lime_robust_test.sh` 时，您可能会看到类似 `bc: command not found` 的错误。`bc` 是一个用于脚本中估算运行时间的命令行计算器工具。此错误表示您的系统上未安装 `bc`。该错误会阻止脚本打印预计运行时间，并且由于脚本中的 `set -e`，可能会导致脚本提前终止。
+
+**解决方法：** 使用系统的包管理器安装 `bc`。例如：
+*   Debian/Ubuntu: `sudo apt-get update && sudo apt-get install bc`
+*   CentOS/RHEL: `sudo yum install bc`
+
+安装 `bc` 后，脚本应该能够正确运行。
+
 ## 在GPU实例上运行
 
 建议在GPU实例上运行这些测试，因为LIME解释计算可能非常密集。要在后台运行测试，使用：
