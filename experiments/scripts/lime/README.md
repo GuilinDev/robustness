@@ -95,6 +95,9 @@ python experiments/scripts/lime/analyze_lime_robustness_results.py \
 ```bash
 nohup bash experiments/scripts/lime/run_lime_test.sh > lime_standard_log.out 2>&1 &
 ```
+```bash
+nohup bash experiments/scripts/lime/run_lime_robust_test.sh > lime_robust_log.out 2>&1 &
+```
 
 要检查测试进度，可以查看日志文件：
 
