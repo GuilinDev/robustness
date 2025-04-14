@@ -17,6 +17,7 @@ from sklearn.metrics import mutual_info_score
 import lime
 from lime import lime_image
 import matplotlib.pyplot as plt
+import math
 
 # 添加RobustBench相关导入
 try:
@@ -47,6 +48,16 @@ def clipped_zoom(img, zoom_factor):
     if zoomed.shape[:2] != (h, w):
         zoomed = cv2.resize(zoomed, (w, h))
     return zoomed
+
+def replace_nan_with_none(obj):
+    """Recursively replace NaN values with None in a nested structure."""
+    if isinstance(obj, dict):
+        return {k: replace_nan_with_none(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_with_none(elem) for elem in obj]
+    elif isinstance(obj, float) and math.isnan(obj):
+        return None
+    return obj
 
 class LIMERobustnessTest:
     """LIME鲁棒性测试类"""
@@ -471,8 +482,8 @@ class LIMERobustnessTest:
                             
                         # 保存临时结果
                         if temp_file:
-                            with open(temp_file, 'w') as f:
-                                json.dump(results, f)
+                            with open(temp_file, 'w') as f_temp:
+                                json.dump(replace_nan_with_none(results), f_temp, indent=4)
                 
                 # 计算处理该图像的时间
                 image_time = time.time() - image_start_time
@@ -495,8 +506,9 @@ class LIMERobustnessTest:
                 continue
         
         # 保存最终结果
-        with open(output_file, 'w') as f:
-            json.dump(results, f)
+        with open(output_file, 'w') as f_out:
+            # Clean NaNs inline before final save
+            json.dump(replace_nan_with_none(results), f_out, indent=4)
             
         total_time = time.time() - start_time
         print(f"\n测试完成! 结果已保存到 {output_file}")
