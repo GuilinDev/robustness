@@ -482,8 +482,17 @@ class LIMERobustnessTest:
                             
                         # 保存临时结果
                         if temp_file:
-                            with open(temp_file, 'w') as f_temp:
-                                json.dump(replace_nan_with_none(results), f_temp, indent=4)
+                            print(f"DEBUG: Attempting to save temp results for {image_path} after severity {severity}...") # DEBUG
+                            try:
+                                cleaned_results = replace_nan_with_none(results)
+                                print(f"DEBUG: NaN replacement complete for {image_path}.") # DEBUG
+                                with open(temp_file, 'w') as f_temp:
+                                    json.dump(cleaned_results, f_temp, indent=4)
+                                print(f"DEBUG: Successfully saved temp file for {image_path}.") # DEBUG
+                            except Exception as dump_error:
+                                print(f"ERROR: Failed to dump JSON for {image_path}. Error: {dump_error}") # DEBUG
+                                # Decide whether to continue or re-raise, maybe just log and continue
+                                # continue # or raise dump_error
                 
                 # 计算处理该图像的时间
                 image_time = time.time() - image_start_time
