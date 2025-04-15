@@ -209,7 +209,7 @@ class LIMERobustnessTest:
                 self.predict_fn,
                 top_labels=1,
                 hide_color=0,
-                num_samples=100,
+                num_samples=25,
                 random_seed=42
             )
         
