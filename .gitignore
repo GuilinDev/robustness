@@ -8,7 +8,12 @@
 *.xml
 
 .venv
-/experiments/data
+
+/experiments/data/*
+!/experiments/data/tiny-imagenet-200/
+/experiments/data/tiny-imagenet-200/*
+!/experiments/data/tiny-imagenet-200/val/
+
 /experiments/results
 /models/
 *.png
