@@ -71,6 +71,7 @@ bash experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_test_lo
 
 ```bash
 bash experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_test.sh
+nohup experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_test.sh > os_standard_log.out 2>&1 &
 ```
 
 可选参数：
@@ -91,6 +92,7 @@ bash experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_test.sh
 
 ```bash
 bash experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_robust_test.sh
+nohup experiments/scripts/occlusion_sensitivity/run_occlusion_sensitivity_robust_test.sh > os_robust_log.out 2>&1 &
 ```
 
 可选参数与标准模型测试相同。
