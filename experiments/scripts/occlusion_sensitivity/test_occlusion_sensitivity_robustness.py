@@ -548,7 +548,11 @@ class OcclusionSensitivityRobustnessTest:
         total_time = time.time() - start_time
         print(f"\n测试完成! 结果已保存到 {output_file}")
         print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
-        print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
+        if total_images > 0:
+            avg_time_per_image = total_time / total_images
+            print(f"平均每张图片耗时: {avg_time_per_image:.1f}秒")
+        else:
+            print("未处理任何图片。")
 
 
 def main():
