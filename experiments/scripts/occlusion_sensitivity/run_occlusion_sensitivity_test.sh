@@ -108,8 +108,8 @@ elif [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
         rm -rf "$TEST_DIR"
         mkdir -p "$TEST_DIR"
         
-        # 随机选择图像并创建样本列表
-        find ${IMAGE_DIR} -type f -name "*.JPEG" | shuf -n $SAMPLE_SIZE --random-source=<(yes $RANDOM_SEED | head -n 1) > "$SAMPLE_LIST"
+        # 随机选择图像并创建样本列表 (使用 awk/sort 替代 shuf 以提高兼容性)
+        find ${IMAGE_DIR} -type f -name "*.JPEG" | awk -v seed=$RANDOM_SEED 'BEGIN { srand(seed); } { print rand() "\t" $0 }' | sort -k1,1n | cut -f2- | head -n $SAMPLE_SIZE > "$SAMPLE_LIST"
         
         # 将选中的图像复制到测试子集目录
         cat "$SAMPLE_LIST" | while read img; do
