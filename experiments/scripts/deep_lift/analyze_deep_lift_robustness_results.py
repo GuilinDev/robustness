@@ -327,15 +327,32 @@ class DeepLIFTRobustnessAnalyzer:
             severity_level: 报告中使用的严重程度级别
             model_type: 模型类型，'standard'或'robust'
         """
-        # 生成热图
-        self.plot_metric_heatmaps(figures_dir, model_type)
-        
+        # 检查'severity'列是否存在，如果存在则生成热图
+        df = self._create_dataframe() # 需要先创建DataFrame以检查列
+        if 'severity' in df.columns:
+            print(f"Generating heatmaps as 'severity' column exists.")
+            self.plot_metric_heatmaps(figures_dir, model_type)
+            heatmap_info = f"Heatmaps saved in: {figures_dir}"
+        else:
+            print(f"Skipping heatmap generation as 'severity' column is missing (likely standard model results).")
+            heatmap_info = "Heatmaps skipped as 'severity' column was missing."
+
         # 生成报告表格
-        self.generate_report_table(report_path, severity_level)
+        # 注意：generate_report_table也可能依赖'severity'，但它接受severity_level参数
+        # 它内部有 severity_df = df[df['severity'] == severity_level]
+        # 如果 'severity' 不存在，这里也会出错。我们需要类似的检查。
+        if 'severity' in df.columns:
+             print(f"Generating report table for severity level {severity_level}.")
+             self.generate_report_table(report_path, severity_level)
+             report_info = f"Report saved as: {report_path}"
+        else:
+             print(f"Skipping report table generation as 'severity' column is missing.")
+             report_info = "Report table skipped as 'severity' column was missing."
         
         # 打印完成信息
-        print(f"Analysis completed. Heatmaps saved in: {figures_dir}")
-        print(f"Report saved as: {report_path}")
+        print(f"Analysis completed.")
+        print(heatmap_info)
+        print(report_info)
 
 def main():
     """主函数"""
