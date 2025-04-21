@@ -67,6 +67,12 @@ class DeepLIFTRobustnessTest:
         else:
             raise ValueError(f"Invalid model_type {model_type} or RobustBench not available")
             
+        # 修复：将模型中所有ReLU层的inplace设置为False，以兼容DeepLIFT
+        for name, module in self.model.named_modules():
+            if isinstance(module, torch.nn.ReLU):
+                module.inplace = False
+        print("Set ReLU inplace=False for DeepLIFT compatibility.")
+
         self.model = self.model.to(self.device)
         self.model.eval()
         
