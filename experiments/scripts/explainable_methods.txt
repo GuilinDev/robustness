@@ -1,4 +1,4 @@
-Integrated Gradients (IG，积分梯度法)
+Integrated Gradients (IG，积分梯度法，IG)
 优势：理论基础更扎实，能够为每个像素分配重要性
 实现：通过captum库容易实现
 处理速度：与GradCAM相当，可能更快
