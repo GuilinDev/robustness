@@ -144,7 +144,7 @@ echo "----------------------------------------"
 
 # 执行LIME鲁棒性测试
 echo "开始执行LIME鲁棒性测试（标准模型）..."
-/workspace/robustness/.venv/bin/python $SCRIPT_PATH \
+python $SCRIPT_PATH \
     --image_dir "$IMAGE_DIR" \
     --output_file "$RESULTS_FILE" \
     --temp_file "$TEMP_FILE" \
@@ -173,7 +173,7 @@ echo "总耗时: ${HOURS}小时 ${MINUTES}分钟 ${SECONDS}秒"
 
 # 分析结果
 echo "分析结果..."
-/workspace/robustness/.venv/bin/python "$SCRIPT_DIR/analyze_lime_robustness_results.py" \
+python "$SCRIPT_DIR/analyze_lime_robustness_results.py" \
     --results_path "$RESULTS_FILE" \
     --figures_dir "$FIGURES_DIR" \
     --report_path "$REPORT_PATH" \

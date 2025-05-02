@@ -18,3 +18,10 @@ DeepLIFT
 优势：比简单梯度提供更好的归因
 实现：captum库提供
 处理速度：通常比SHAP或LIME更快
+
+运行顺序
+
+SHAP (SHapley Additive exPlanations)：SHAP是基于合作博弈理论的方法，与IG和GradCAM有本质区别，能提供不同视角的解释。它的特点是可以量化每个特征对预测的贡献，有坚实的理论基础。尽管计算成本较高，但对鲁棒性研究非常有价值。
+LIME (Local Interpretable Model-agnostic Explanations)：LIME通过在局部拟合可解释的线性模型来解释黑盒模型，这与梯度或特征归因方法截然不同。它是模型无关的，可以提供更直观的解释。
+DeepLIFT (Deep Learning Important FeaTures)：与IG有一定相似性但计算效率更高，可以作为IG结果的补充验证。
+Occlusion Sensitivity：这是一种直观的方法，通过遮挡输入图像的不同部分观察对输出的影响。实现简单但计算量大，可能需要更长时间运行。

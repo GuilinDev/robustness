@@ -142,11 +142,13 @@ echo "结果将保存到: $RESULTS_FILE"
 IMAGE_COUNT=$(find $IMAGE_DIR -type f -name "*.JPEG" | wc -l)
 if [ $IMAGE_COUNT -gt 0 ]; then
   echo "将处理 $IMAGE_COUNT 张图像"
-  # 估算每张图像处理时间 (基于20秒/图像/样本的粗略估计，每个图像15种污染x5个严重程度)
+  # 估算每张图像处理时间 (更精确估计: 每张图像约2分钟，15种腐蚀x5个严重度)
+  # 乘以0.3是考虑我们降低了N_STEPS到3 (原始为10)
   # 鲁棒模型通常比标准模型慢约1.5倍
-  EST_TIME_PER_IMAGE=$(echo "scale=2; 20 * $N_STEPS / 10 * 1.5" | bc)
-  EST_TOTAL_TIME=$(echo "scale=2; $EST_TIME_PER_IMAGE * $IMAGE_COUNT / 3600" | bc)
-  echo "基于每张图像 $EST_TIME_PER_IMAGE 秒的估计，总处理时间约为 $EST_TOTAL_TIME 小时"
+  EST_TIME_PER_IMAGE=180  # 假设每张图像基础处理时间为3分钟(比标准模型慢)
+  EST_TOTAL_TIME=$(echo "scale=2; $EST_TIME_PER_IMAGE * $IMAGE_COUNT / 60" | bc)
+  echo "基于每张图像约 $EST_TIME_PER_IMAGE 秒的估计，总处理时间约为 $EST_TOTAL_TIME 小时"
+  echo "首张图像处理可能需要更长时间，因为要加载模型并预热缓存"
   echo "实际时间可能因硬件性能和图像复杂度而异"
 fi
 
@@ -156,7 +158,7 @@ echo "启动时间: $START_TIME"
 echo "----------------------------------------"
 
 # 运行脚本
-/workspace/robustness/.venv/bin/python $SCRIPT_PATH \
+/workspace/robustness/.venv/bin/python -u $SCRIPT_PATH \
   --image_dir $IMAGE_DIR \
   --output_file $RESULTS_FILE \
   --temp_file $TEMP_FILE \

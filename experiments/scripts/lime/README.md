@@ -2,145 +2,98 @@
 
 此目录包含用于测试LIME解释方法对各种图像腐蚀（噪声、模糊、天气效果等）的鲁棒性的脚本。
 
-## 系统依赖
+## 依赖项
 
-除了Python依赖项之外，这些脚本还需要OpenCV系统依赖：
+1.  **Python:** 安装 `requirements.txt` 中的依赖项:
+    ```bash
+    pip install -r experiments/scripts/lime/requirements.txt
+    ```
+2.  **OpenCV:** 需要系统级的OpenCV库。根据您的系统安装：
+    *   **Ubuntu/Debian:** `sudo apt-get update && sudo apt-get install -y libopencv-dev python3-opencv`
+    *   **CentOS/RHEL:** `sudo yum install -y opencv opencv-devel`
+    *   **MacOS:** `brew install opencv`
+3.  **bc (可选):** 脚本使用 `bc` 估算运行时间。如果未安装，会看到 `bc: command not found` 错误，但这不会影响核心计算。安装方法:
+    *   Debian/Ubuntu: `sudo apt-get install bc`
+    *   CentOS/RHEL: `sudo yum install bc`
 
-### Ubuntu/Debian
-```bash
-sudo apt-get update
-sudo apt-get install -y libopencv-dev python3-opencv
-```
+## 性能与配置
 
-### CentOS/RHEL
-```bash
-sudo yum install -y opencv opencv-devel
-```
+LIME计算量较大。脚本默认启用优化 (`OPTIMIZE=true`)，使用 **1000张图像样本** (`SAMPLE_SIZE=1000`) 和 **50个LIME采样步数** (`STEPS=50`)，这是推荐的平衡性能和结果质量的配置。您可以在脚本顶部修改这些默认值，或通过命令行参数覆盖 (例如 `--samples 500 --steps 100`)。
 
-### MacOS
-```bash
-brew install opencv
-```
+## 运行测试
 
-## 性能考虑
+**重要:** 在运行任何脚本之前，请确保已激活您的项目虚拟环境 (e.g., `source .venv/bin/activate`).
 
-LIME解释生成在计算上比GradCAM更密集。处理大量图像可能需要很长时间。可以通过以下方式优化性能：
+### 本地快速测试
 
-1. 使用`--optimize`选项减少超参数(例如样本数量)
-2. 使用`--steps`选项手动设置样本数(默认为1000，建议10-200用于快速测试)
-3. 使用`--test`选项运行测试模式，仅处理20张图像
-
-示例:
-```bash
-bash experiments/scripts/lime/run_lime_test.sh --optimize --steps 50
-```
-
-## 本地测试
-
-要在少量图像上运行快速测试以验证设置是否正确，请使用:
+使用 `run_lime_test.sh` 或 `run_lime_robust_test.sh` 的 `--test` 标志可在20张图像上快速验证脚本是否正常工作：
 
 ```bash
-bash experiments/scripts/lime/run_lime_test_local.sh
+# 测试标准模型
+bash experiments/scripts/lime/run_lime_test.sh --test
+
+# 测试鲁棒模型
+bash experiments/scripts/lime/run_lime_robust_test.sh --test
 ```
 
-这将处理一个特定类别的几张图像。
+### 完整测试 (推荐：后台运行)
 
-## 运行完整测试
+建议在GPU服务器上运行完整测试，并使用 `nohup` 在后台执行，以防连接中断。这将使用默认的1000张图像和50个LIME步骤。
 
-要在Tiny-ImageNet-200验证集上使用标准模型运行完整测试：
-
+**1. 运行标准模型:**
 ```bash
-bash experiments/scripts/lime/run_lime_test.sh
+nohup bash experiments/scripts/lime/run_lime_test.sh > lime_standard_run.log 2>&1 &
 ```
 
-要使用鲁棒模型运行测试：
-
+**2. 运行鲁棒模型:**
+*(请在标准模型运行完成后再运行此命令，因为它依赖标准模型创建的样本列表)*
 ```bash
-bash experiments/scripts/lime/run_lime_robust_test.sh
+nohup bash experiments/scripts/lime/run_lime_robust_test.sh > lime_robust_run.log 2>&1 &
 ```
+
+**3. 监控进度:**
+您可以使用 `tail` 命令查看日志文件以监控进度或检查错误：
+```bash
+tail -f lime_standard_run.log
+# (完成后，使用 Ctrl+C 退出 tail)
+
+tail -f lime_robust_run.log
+# (完成后，使用 Ctrl+C 退出 tail)
+```
+
+运行完成后，结果JSON文件将保存在 `experiments/results/` 目录中，分析报告和图表会自动生成。
 
 ## 手动运行分析
 
-如果您已经有了测试结果，可以单独运行分析脚本:
+如果计算和分析分开进行，或需要重新生成报告/图表，可以手动运行分析脚本。请确保为 `standard` 和 `robust` 模型分别指定正确的路径和 `--model_type`。
 
 ```bash
+# 标准模型分析示例
 python experiments/scripts/lime/analyze_lime_robustness_results.py \
-    --results_path experiments/results/lime_robustness_results.json \
-    --figures_dir experiments/results/figures/lime \
-    --report_path experiments/results/lime_analysis_report.md \
-    --severity_level 3
-```
+  --results_path experiments/results/lime_robustness_standard_results.json \
+  --figures_dir experiments/results/figures/lime_standard \
+  --report_path experiments/results/lime_standard_analysis_report.md \
+  --model_type standard
 
-## 故障排除
-
-### 灰色稳定性热图
-
-如果生成的稳定性热图在所有单元格中显示相同的值(例如都为1.000)，热图可能会显示为灰色。这是正常的，表示该解释方法在不同的腐蚀和严重级别上一致地表现。不需要任何更改。
-
-### 缺少OpenCV依赖
-
-如果您在运行脚本时看到与OpenCV相关的错误，请确保已安装系统依赖项（见上文）。
-
-### 内存问题
-
-如果您在处理图像时遇到内存问题，请考虑：
-1. 使用`--optimize --steps 10`选项减少LIME样本数量
-2. 使用`--test`选项运行测试模式，仅处理20张图像
-3. 在具有更多RAM的计算机上运行测试
-
-### `bc: command not found` 错误
-
-运行 `run_lime_test.sh` 或 `run_lime_robust_test.sh` 时，您可能会看到类似 `bc: command not found` 的错误。`bc` 是一个用于脚本中估算运行时间的命令行计算器工具。此错误表示您的系统上未安装 `bc`。该错误会阻止脚本打印预计运行时间，并且由于脚本中的 `set -e`，可能会导致脚本提前终止。
-
-**解决方法：** 使用系统的包管理器安装 `bc`。例如：
-*   Debian/Ubuntu: `sudo apt-get update && sudo apt-get install bc`
-*   CentOS/RHEL: `sudo yum install bc`
-
-安装 `bc` 后，脚本应该能够正确运行。
-
-## 在GPU实例上运行
-
-建议在GPU实例上运行这些测试，因为LIME解释计算可能非常密集。要在后台运行测试，使用：
-
-```bash
-nohup bash experiments/scripts/lime/run_lime_test.sh > lime_standard_log.out 2>&1 &
-```
-```bash
-nohup bash experiments/scripts/lime/run_lime_robust_test.sh > lime_robust_log.out 2>&1 &
-```
-
-要检查测试进度，可以查看日志文件：
-
-```bash
-tail -f lime_standard_log.out
+# 鲁棒模型分析示例
+python experiments/scripts/lime/analyze_lime_robustness_results.py \
+  --results_path experiments/results/lime_robustness_robust_results.json \
+  --figures_dir experiments/results/figures/lime_robust \
+  --report_path experiments/results/lime_robust_analysis_report.md \
+  --model_type robust
 ```
 
 ## 图表标识说明
 
 生成的热图包含两种重要的标识信息：
 
-1. **标题标识**：每个热图的标题会显示"LIME: [指标名称]"，清晰标识这些结果是使用LIME方法生成的。
+1. **标题标识**: 每个热图的标题会显示"LIME: [指标名称]"。
+2. **模型类型水印**: 每个热图的右下角有一个水印标识：
+   - **S**: 标准模型 (Standard model)
+   - **R**: 鲁棒模型 (Robust model)
 
-2. **模型类型水印**：每个热图的右下角有一个水印标识：
-   - **S**: 表示使用标准模型 (Standard model) 生成的结果
-   - **R**: 表示使用鲁棒模型 (Robust model) 生成的结果
+## 故障排除
 
-这样的标识方式能够在比较不同解释方法和不同模型的结果时，快速识别图表来源。水印使用白色填充和黑色边框设计，确保在任何背景颜色下都清晰可见。
-
-### 运行分析脚本示例
-
-```bash
-# 标准模型分析
-python experiments/scripts/lime/analyze_lime_robustness_results.py \
-  --results_path experiments/results/lime_robustness_results.json \
-  --figures_dir experiments/results/figures/lime/standard \
-  --report_path experiments/results/lime/standard/analysis_report.md \
-  --model_type standard
-
-# 鲁棒模型分析
-python experiments/scripts/lime/analyze_lime_robustness_results.py \
-  --results_path experiments/results/lime_robustness_robust_results.json \
-  --figures_dir experiments/results/figures/lime/robust \
-  --report_path experiments/results/lime/robust/analysis_report.md \
-  --model_type robust
-``` 
+*   **缺少OpenCV依赖:** 参见上面的依赖项部分。
+*   **内存问题:** 尝试减少LIME采样步数 (例如 `--steps 20`) 或减少处理的图像数量 (例如 `--samples 100`)。
+*   **`bc: command not found`:** 参见上面的依赖项部分 (安装`bc`是可选的)。

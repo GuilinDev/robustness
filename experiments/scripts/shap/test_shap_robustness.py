@@ -52,27 +52,36 @@ class SHAPRobustnessTest:
     """SHAP鲁棒性测试类"""
     
     def __init__(self, model_type="standard", device: torch.device = None):
+        print("开始初始化SHAPRobustnessTest...")
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"使用设备: {self.device}")
         
         # 根据model_type选择不同的模型
         self.model_type = model_type
+        print(f"准备加载{model_type}模型...")
         if model_type == "standard":
+            print("正在加载标准ResNet50模型...")
             self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-            print("Loaded standard ResNet50 model")
+            print("标准ResNet50模型加载完成")
         elif model_type == "robust" and ROBUSTBENCH_AVAILABLE:
+            print("正在加载RobustBench Salman2020Do_50_2模型...")
             self.model = load_model(model_name='Salman2020Do_50_2', dataset='imagenet', threat_model='Linf')
-            print("Loaded RobustBench Salman2020Do_50_2 model")
+            print("RobustBench模型加载完成")
         else:
             raise ValueError(f"Invalid model_type {model_type} or RobustBench not available")
             
+        print(f"将模型移动到设备 {self.device}...")
         self.model = self.model.to(self.device)
         self.model.eval()
+        print("模型设置完成")
         
         # 创建SHAP解释器
+        print("初始化SHAP解释器...")
         self.background = torch.zeros((1, 3, 224, 224)).to(self.device)  # 黑色背景
         self.explainer = shap.GradientExplainer(self.model, self.background)
+        print("SHAP解释器初始化完成")
         
+        print("设置图像转换函数...")
         self.transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
@@ -87,7 +96,9 @@ class SHAPRobustnessTest:
                 std=[1/0.229, 1/0.224, 1/0.225]
             )
         ])
+        print("图像转换函数设置完成")
         
+        print("设置腐蚀类型列表...")
         self.corruption_types = [
             'gaussian_noise', 'shot_noise', 'impulse_noise',
             'defocus_blur', 'glass_blur', 'motion_blur', 'zoom_blur',
@@ -95,6 +106,7 @@ class SHAPRobustnessTest:
             'contrast', 'elastic_transform', 'pixelate', 'jpeg'
         ]
         self.alexnet_baseline = 0.7  # AlexNet在Tiny-ImageNet上的错误率
+        print("SHAPRobustnessTest初始化完成")
 
     def load_image(self, image_path: str) -> Tuple[torch.Tensor, Image.Image]:
         """加载图像并转换为模型输入格式"""
@@ -184,8 +196,14 @@ class SHAPRobustnessTest:
             output = self.model(input_tensor)
             target_class = torch.argmax(output, dim=1).item()
         
-        # 计算SHAP值 - 使用更少的样本数来提高性能
-        shap_values = self.explainer.shap_values(input_tensor, nsamples=3)
+        try:
+            # 计算SHAP值 - 使用更少的样本数来提高性能
+            shap_values = self.explainer.shap_values(input_tensor, nsamples=3)
+        except Exception as e:
+            print(f"生成SHAP解释时出错: {str(e)}")
+            print(f"输入张量形状: {input_tensor.shape}")
+            print(f"目标类别: {target_class}")
+            raise
         
         # 如果shap_values是list类型，取对应预测类别的值
         if isinstance(shap_values, list):
@@ -529,7 +547,11 @@ def main():
     
     args = parser.parse_args()
     
+    print(f"===== SHAP鲁棒性测试初始化 =====")
+    print(f"参数: {args}")
+    
     # 创建输出目录
+    print(f"创建输出目录...")
     os.makedirs(os.path.dirname(os.path.abspath(args.output_file)), exist_ok=True)
     if args.temp_file:
         os.makedirs(os.path.dirname(os.path.abspath(args.temp_file)), exist_ok=True)
@@ -538,11 +560,15 @@ def main():
     device = None
     if args.device:
         device = torch.device(args.device)
+    print(f"准备使用设备: {'默认(CUDA或CPU)' if device is None else device}")
     
     # 创建测试实例
+    print(f"初始化SHAP鲁棒性测试实例（{args.model_type}模型）...")
     tester = SHAPRobustnessTest(model_type=args.model_type, device=device)
+    print(f"SHAP测试实例初始化完成！")
     
     # 运行测试
+    print(f"开始运行SHAP鲁棒性测试...")
     tester.test_robustness(
         image_dir=args.image_dir,
         output_file=args.output_file,

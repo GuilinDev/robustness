@@ -14,10 +14,10 @@ from skimage.filters import gaussian
 from skimage import util as sk_util
 from io import BytesIO
 from sklearn.metrics import mutual_info_score
+import lime
+from lime import lime_image
 import matplotlib.pyplot as plt
-
-# 导入Captum库 (修改为 GradientShap)
-from captum.attr import GradientShap
+import math
 
 # 添加RobustBench相关导入
 try:
@@ -49,8 +49,18 @@ def clipped_zoom(img, zoom_factor):
         zoomed = cv2.resize(zoomed, (w, h))
     return zoomed
 
-class DeepLIFTRobustnessTest:
-    """DeepLIFT鲁棒性测试类"""
+def replace_nan_with_none(obj):
+    """Recursively replace NaN values with None in a nested structure."""
+    if isinstance(obj, dict):
+        return {k: replace_nan_with_none(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_nan_with_none(elem) for elem in obj]
+    elif isinstance(obj, float) and math.isnan(obj):
+        return None
+    return obj
+
+class LIMERobustnessTest:
+    """LIME鲁棒性测试类"""
     
     def __init__(self, model_type="standard", device: torch.device = None):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -67,22 +77,11 @@ class DeepLIFTRobustnessTest:
         else:
             raise ValueError(f"Invalid model_type {model_type} or RobustBench not available")
             
-        # 修复：递归替换模型中所有ReLU层为新的inplace=False实例
-        def replace_relu(module):
-            for name, child_module in module.named_children():
-                if isinstance(child_module, torch.nn.ReLU):
-                    setattr(module, name, torch.nn.ReLU(inplace=False))
-                else:
-                    replace_relu(child_module)
-
-        replace_relu(self.model)
-        print("Replaced ReLU layers with inplace=False instances for DeepLIFT compatibility.")
-
         self.model = self.model.to(self.device)
         self.model.eval()
         
-        # 创建解释器 (修改为 GradientShap)
-        self.explainer = GradientShap(self.model)
+        # 创建LIME解释器
+        self.explainer = lime_image.LimeImageExplainer()
         
         self.transform = transforms.Compose([
             transforms.Resize(256),
@@ -106,6 +105,16 @@ class DeepLIFTRobustnessTest:
             'contrast', 'elastic_transform', 'pixelate', 'jpeg'
         ]
         self.alexnet_baseline = 0.7  # AlexNet在Tiny-ImageNet上的错误率
+        
+        # 定义LIME需要的预测函数
+        def predict_fn(images):
+            batch = torch.stack([self.transform(Image.fromarray(img)) for img in images])
+            batch = batch.to(self.device)
+            with torch.no_grad():
+                output = self.model(batch)
+            return torch.nn.functional.softmax(output, dim=1).cpu().numpy()
+            
+        self.predict_fn = predict_fn
 
     def load_image(self, image_path: str) -> Tuple[torch.Tensor, Image.Image]:
         """加载图像并转换为模型输入格式"""
@@ -188,59 +197,46 @@ class DeepLIFTRobustnessTest:
         corrupted = np.clip(corrupted * 255, 0, 255).astype(np.uint8)
         return Image.fromarray(corrupted)
 
-    def generate_deep_lift(self, image_tensor: torch.Tensor, target_class=None) -> np.ndarray:
-        """生成DeepLIFT解释"""
-        image_tensor.requires_grad_()
+    def generate_lime(self, image: Image.Image) -> np.ndarray:
+        """生成LIME解释"""
+        # 转换为numpy数组
+        img_array = np.array(image)
         
-        # 获取模型预测
+        # 使用LIME解释器
         with torch.no_grad():
-            output = self.model(image_tensor)
-            pred_class = torch.argmax(output, dim=1).item() if target_class is None else target_class
+            explanation = self.explainer.explain_instance(
+                img_array, 
+                self.predict_fn,
+                top_labels=1,
+                hide_color=0,
+                num_samples=25,
+                random_seed=42
+            )
         
-        # 使用DeepLIFT生成解释，添加全零基线 (DeepLiftShap需要多个基线)
-        num_baselines = 10 # 定义基线样本数量
-        baselines = torch.zeros_like(image_tensor).repeat(num_baselines, 1, 1, 1)
-        attribution = self.explainer.attribute(image_tensor, target=pred_class, baselines=baselines)
+        # 获取预测的类别
+        with torch.no_grad():
+            output = self.model(self.transform(image).unsqueeze(0).to(self.device))
+            pred_class = torch.argmax(output, dim=1).item()
         
-        # 将解释转换为numpy数组
-        attr_map = attribution.squeeze(0).cpu().detach().numpy()
-        
-        # 计算所有通道的平均值
-        attr_map = np.mean(np.abs(attr_map), axis=0)
+        # 获取解释
+        _, mask = explanation.get_image_and_mask(
+            pred_class,
+            positive_only=True,
+            num_features=10,
+            hide_rest=False
+        )
         
         # 归一化
-        if np.max(attr_map) > 0:
-            attr_map = attr_map / np.max(attr_map)
+        if np.max(mask) > 0:
+            mask = mask / np.max(mask)
         
-        return attr_map
+        return mask
 
-    def generate_multiple_deep_lifts(self, image_tensor: torch.Tensor, n_samples: int = 5) -> List[np.ndarray]:
-        """生成多次DeepLIFT解释以计算稳定性"""
+    def generate_multiple_limes(self, image: Image.Image, n_samples: int = 5) -> List[np.ndarray]:
+        """生成多次LIME解释以计算稳定性"""
         explanations = []
-        
-        # 对于DeepLIFT，多次生成相同输入的解释是确定性的
-        # 为了引入一些变化，我们可以稍微扰动输入图像
-        for i in range(n_samples):
-            # 添加少量噪声以创建略微不同的输入
-            noise_level = 0.01 * (i + 1) / n_samples
-            noisy_tensor = image_tensor + noise_level * torch.randn_like(image_tensor)
-            noisy_tensor.requires_grad_() # DeepLIFT 需要 grad
-            
-            # 获取带噪声输入的预测类别
-            with torch.no_grad():
-                noisy_output = self.model(noisy_tensor)
-                noisy_pred_class = torch.argmax(noisy_output, dim=1).item()
-                
-            # 为带噪声的输入生成DeepLIFT解释，同样添加基线 (DeepLiftShap需要多个基线)
-            num_baselines = 10 # 定义基线样本数量
-            baselines = torch.zeros_like(noisy_tensor).repeat(num_baselines, 1, 1, 1)
-            noisy_attribution = self.explainer.attribute(noisy_tensor, target=noisy_pred_class, baselines=baselines)
-            noisy_attr_map = noisy_attribution.squeeze(0).cpu().detach().numpy()
-            noisy_attr_map = np.mean(np.abs(noisy_attr_map), axis=0)
-            if np.max(noisy_attr_map) > 0:
-                noisy_attr_map = noisy_attr_map / np.max(noisy_attr_map)
-            explanations.append(noisy_attr_map)
-        
+        for _ in range(n_samples):
+            explanations.append(self.generate_lime(image))
         return explanations
 
     def compute_metrics(self, img_explanation: np.ndarray, corrupted_explanation: np.ndarray, 
@@ -337,10 +333,10 @@ class DeepLIFTRobustnessTest:
         plt.title("Original Image")
         plt.axis('off')
         
-        # 显示原始图像的DeepLIFT解释
+        # 显示原始图像的LIME解释
         plt.subplot(2, 2, 2)
         plt.imshow(original_attr, cmap='jet')
-        plt.title("Original DeepLIFT")
+        plt.title("Original LIME")
         plt.axis('off')
         
         # 显示腐蚀后的图像
@@ -349,10 +345,10 @@ class DeepLIFTRobustnessTest:
         plt.title(f"{corruption_type} (Severity {severity})")
         plt.axis('off')
         
-        # 显示腐蚀后图像的DeepLIFT解释
+        # 显示腐蚀后图像的LIME解释
         plt.subplot(2, 2, 4)
         plt.imshow(corrupted_attr, cmap='jet')
-        plt.title("Corrupted DeepLIFT")
+        plt.title("Corrupted LIME")
         plt.axis('off')
         
         plt.tight_layout()
@@ -362,7 +358,7 @@ class DeepLIFTRobustnessTest:
     def test_robustness(self, image_dir: str, output_file: str, temp_file: str = None, 
                        save_viz: bool = False, viz_dir: str = None, test_mode: bool = False,
                        test_samples: int = 10):
-        """测试DeepLIFT解释的鲁棒性"""
+        """测试LIME解释的鲁棒性"""
         results = {}
         
         # 如果提供了临时文件且存在，则加载它
@@ -420,13 +416,13 @@ class DeepLIFTRobustnessTest:
                 
                 print(f"  原始图片预测类别: {pred_class}")
                 
-                # 生成原始图像的DeepLIFT解释
-                print(f"  生成原始图片的DeepLIFT解释...")
-                original_explanation = self.generate_deep_lift(input_tensor, pred_class)
+                # 生成原始图像的LIME解释
+                print(f"  生成原始图片的LIME解释...")
+                original_explanation = self.generate_lime(original_image)
                 
-                # 生成多个DeepLIFT解释用于稳定性计算
+                # 生成多个LIME解释用于稳定性计算
                 print(f"  生成多个解释用于稳定性计算...")
-                original_stability_explanations = self.generate_multiple_deep_lifts(input_tensor)
+                original_stability_explanations = self.generate_multiple_limes(original_image)
                 
                 # 处理每种腐蚀类型
                 corruption_count = 0
@@ -451,11 +447,11 @@ class DeepLIFTRobustnessTest:
                         corrupted_probs = torch.nn.functional.softmax(corrupted_output, dim=1).cpu().numpy()[0]
                         corrupted_pred_class = torch.argmax(corrupted_output, dim=1).item()
                         
-                        # 生成腐蚀后图像的DeepLIFT解释
-                        corrupted_explanation = self.generate_deep_lift(corrupted_tensor, corrupted_pred_class)
+                        # 生成腐蚀后图像的LIME解释
+                        corrupted_explanation = self.generate_lime(corrupted_image)
                         
-                        # 生成多个DeepLIFT解释用于稳定性计算
-                        corrupted_stability_explanations = self.generate_multiple_deep_lifts(corrupted_tensor)
+                        # 生成多个LIME解释用于稳定性计算
+                        corrupted_stability_explanations = self.generate_multiple_limes(corrupted_image)
                         
                         # 计算指标
                         metrics = self.compute_metrics(
@@ -486,8 +482,17 @@ class DeepLIFTRobustnessTest:
                             
                         # 保存临时结果
                         if temp_file:
-                            with open(temp_file, 'w') as f:
-                                json.dump(results, f)
+                            print(f"DEBUG: Attempting to save temp results for {image_path} after severity {severity}...") # DEBUG
+                            try:
+                                cleaned_results = replace_nan_with_none(results)
+                                print(f"DEBUG: NaN replacement complete for {image_path}.") # DEBUG
+                                with open(temp_file, 'w') as f_temp:
+                                    json.dump(cleaned_results, f_temp, indent=4)
+                                print(f"DEBUG: Successfully saved temp file for {image_path}.") # DEBUG
+                            except Exception as dump_error:
+                                print(f"ERROR: Failed to dump JSON for {image_path}. Error: {dump_error}") # DEBUG
+                                # Decide whether to continue or re-raise, maybe just log and continue
+                                # continue # or raise dump_error
                 
                 # 计算处理该图像的时间
                 image_time = time.time() - image_start_time
@@ -510,8 +515,9 @@ class DeepLIFTRobustnessTest:
                 continue
         
         # 保存最终结果
-        with open(output_file, 'w') as f:
-            json.dump(results, f)
+        with open(output_file, 'w') as f_out:
+            # Clean NaNs inline before final save
+            json.dump(replace_nan_with_none(results), f_out, indent=4)
             
         total_time = time.time() - start_time
         print(f"\n测试完成! 结果已保存到 {output_file}")
@@ -519,7 +525,7 @@ class DeepLIFTRobustnessTest:
         print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
 
 def main():
-    parser = argparse.ArgumentParser(description="测试DeepLIFT解释的鲁棒性")
+    parser = argparse.ArgumentParser(description="测试LIME解释的鲁棒性")
     parser.add_argument('--image_dir', type=str, required=True, help="图像目录的路径")
     parser.add_argument('--output_file', type=str, required=True, help="输出结果文件的路径")
     parser.add_argument('--temp_file', type=str, help="临时结果文件的路径")
@@ -544,7 +550,7 @@ def main():
         device = torch.device(args.device)
     
     # 创建测试实例
-    tester = DeepLIFTRobustnessTest(model_type=args.model_type, device=device)
+    tester = LIMERobustnessTest(model_type=args.model_type, device=device)
     
     # 运行测试
     tester.test_robustness(
