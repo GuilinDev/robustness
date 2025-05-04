@@ -97,3 +97,19 @@ python experiments/scripts/lime/analyze_lime_robustness_results.py \
 *   **缺少OpenCV依赖:** 参见上面的依赖项部分。
 *   **内存问题:** 尝试减少LIME采样步数 (例如 `--steps 20`) 或减少处理的图像数量 (例如 `--samples 100`)。
 *   **`bc: command not found`:** 参见上面的依赖项部分 (安装`bc`是可选的)。
+*   **运行鲁棒模型时出错 `ValueError: Invalid model_type robust or RobustBench not available` 或 `ModuleNotFoundError: No module named 'autoattack'` / `'autoattack.state'`:**
+    *   **原因:** 这是由于 `robustbench` 库 (例如版本 1.1.1) 中的一个已知问题，它依赖 `pyautoattack` 包，但在其代码中错误地尝试 `import autoattack`。
+    *   **解决方案:** 需要手动编辑虚拟环境中的 `robustbench` 源代码。
+        1.  找到文件: `.venv/lib/python<版本>/site-packages/robustbench/eval.py` (将 `<版本>` 替换为您的Python版本，例如 `3.10`)。
+        2.  打开该文件进行编辑 (可能需要 `sudo` 权限)。
+        3.  找到以下两行 (大约在第10-11行):
+            ```python
+            from autoattack import AutoAttack
+            from autoattack.state import EvaluationState
+            ```
+        4.  将这两行修改为:
+            ```python
+            from pyautoattack import AutoAttack
+            from pyautoattack.state import EvaluationState
+            ```
+        5.  保存文件。之后，鲁棒模型脚本应该能够正常运行。
