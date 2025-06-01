@@ -17,7 +17,7 @@ from sklearn.metrics import mutual_info_score
 from captum.attr import IntegratedGradients
 import matplotlib.pyplot as plt
 
-# 添加RobustBench相关导入
+# add RobustBench related imports
 try:
     from robustbench.utils import load_model
     ROBUSTBENCH_AVAILABLE = True
@@ -54,7 +54,7 @@ class IGRobustnessTest:
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"使用设备: {self.device}")
         
-        # 根据model_type选择不同的模型
+        # select different models based on model_type
         self.model_type = model_type
         if model_type == "standard":
             self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
@@ -65,25 +65,25 @@ class IGRobustnessTest:
                     self.model = load_model(model_name='Salman2020Do_50_2', dataset='imagenet', threat_model='Linf')
                     print("Loaded RobustBench Salman2020Do_50_2 model")
                 except Exception as e:
-                    print(f"警告: 无法加载鲁棒模型, 回退到标准模型. 错误: {str(e)}")
+                    print(f"Warning: Unable to load robust model, falling back to standard model. Error: {str(e)}")
                     self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-                    print("回退使用标准 ResNet50 模型")
-                    self.model_type = "standard"  # 更新模型类型
+                    print("Falling back to standard ResNet50 model")
+                    self.model_type = "standard"  # update model type
             else:
-                print("警告: RobustBench未安装或不可用, 回退到标准模型")
+                print("Warning: RobustBench not installed or not available, falling back to standard model")
                 self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-                print("回退使用标准 ResNet50 模型")
-                self.model_type = "standard"  # 更新模型类型
+                print("Falling back to standard ResNet50 model")
+                self.model_type = "standard"  # update model type
         else:
-            print(f"警告: 未知的模型类型 '{model_type}', 回退到标准模型")
+            print(f"Warning: Unknown model type '{model_type}', falling back to standard model")
             self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-            print("回退使用标准 ResNet50 模型")
-            self.model_type = "standard"  # 更新模型类型
+            print("Falling back to standard ResNet50 model")
+            self.model_type = "standard"  # update model type
             
         self.model = self.model.to(self.device)
         self.model.eval()
         
-        # 创建Integrated Gradients解释器
+        # create Integrated Gradients explainer
         self.ig = IntegratedGradients(self.model)
         
         self.transform = transforms.Compose([
@@ -93,7 +93,7 @@ class IGRobustnessTest:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
-        # 图像反归一化转换，用于展示
+        # image denormalization for visualization
         self.inverse_transform = transforms.Compose([
             transforms.Normalize(
                 mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225],
@@ -107,16 +107,16 @@ class IGRobustnessTest:
             'snow', 'frost', 'fog', 'brightness',
             'contrast', 'elastic_transform', 'pixelate', 'jpeg'
         ]
-        self.alexnet_baseline = 0.7  # AlexNet在Tiny-ImageNet上的错误率
+        self.alexnet_baseline = 0.7  # error rate of AlexNet on Tiny-ImageNet
 
     def load_image(self, image_path: str) -> Tuple[torch.Tensor, Image.Image]:
-        """加载图像并转换为模型输入格式"""
+        """load image and convert to model input format"""
         original_image = Image.open(image_path).convert('RGB')
         input_tensor = self.transform(original_image).unsqueeze(0)
         return input_tensor.to(self.device), original_image
 
     def apply_corruption(self, image: Image.Image, corruption_type: str, severity: int) -> Image.Image:
-        """应用图像腐蚀"""
+        """apply image corruption"""
         img = np.array(image) / 255.0
         np.random.seed(1)
         severity = float(severity) / 5.0
@@ -191,37 +191,37 @@ class IGRobustnessTest:
         return Image.fromarray(corrupted)
 
     def generate_ig(self, input_tensor: torch.Tensor) -> np.ndarray:
-        """生成Integrated Gradients解释"""
-        # 创建梯度的目标
+        """generate Integrated Gradients explanation"""
+        # create gradient target
         if self.model_type == "standard":
-            # 对于标准ResNet50，我们使用预测的类别作为目标
+            # for standard ResNet50, we use the predicted class as target
             with torch.no_grad():
                 output = self.model(input_tensor)
                 target_class = torch.argmax(output, dim=1).item()
         else:
-            # 对于鲁棒模型，同样使用预测的类别
+            # for robust model, use the predicted class as well
             with torch.no_grad():
                 output = self.model(input_tensor)
                 target_class = torch.argmax(output, dim=1).item()
         
-        # 计算IG归因
+        # calculate IG attribution
         attributions = self.ig.attribute(
             input_tensor, 
             target=target_class, 
-            n_steps=50  # 积分步数，可以根据需要调整
+            n_steps=50  # number of integration steps, can be adjusted
         )
         
-        # 转换为numpy数组并计算绝对值之和(跨通道)
+        # convert to numpy array and calculate absolute sum (across channels)
         attr_sum = torch.abs(attributions).sum(dim=1).squeeze(0).cpu().detach().numpy()
         
-        # 归一化到[0, 1]范围
+        # normalize to [0, 1] range
         attr_norm = (attr_sum - attr_sum.min()) / (attr_sum.max() - attr_sum.min() + 1e-8)
         
-        # 调整大小到224x224并返回
+        # resize to 224x224 and return
         return cv2.resize(attr_norm, (224, 224))
 
     def generate_multiple_igs(self, input_tensor: torch.Tensor, n_samples: int = 5) -> List[np.ndarray]:
-        """生成多次IG解释以计算稳定性"""
+        """generate multiple IG explanations to calculate stability"""
         explanations = []
         for _ in range(n_samples):
             explanations.append(self.generate_ig(input_tensor))
@@ -230,19 +230,19 @@ class IGRobustnessTest:
     def compute_metrics(self, img_explanation: np.ndarray, corrupted_explanation: np.ndarray, 
                       img_pred: int, corrupted_pred: int, img_probs: np.ndarray, 
                       corrupted_probs: np.ndarray, stability_list: List[np.ndarray] = None) -> Dict:
-        """计算解释方法的鲁棒性指标"""
+        """calculate robustness metrics for explanation methods"""
         
-        # 1. 相似度指标 (余弦相似度)
+        # 1. similarity metric (cosine similarity)
         cosine_sim = np.sum(img_explanation * corrupted_explanation) / (
             np.sqrt(np.sum(img_explanation**2)) * np.sqrt(np.sum(corrupted_explanation**2)) + 1e-8)
         
-        # 2. 一致性指标 (使用互信息)
-        # 将解释转换为直方图以计算互信息
+        # 2. consistency metric (using mutual information)
+        # convert explanation to histogram to calculate mutual information
         img_hist = np.histogram(img_explanation.flatten(), bins=20)[0]
         corrupted_hist = np.histogram(corrupted_explanation.flatten(), bins=20)[0]
         mutual_info = mutual_info_score(img_hist, corrupted_hist)
 
-        # 3. 定位指标 (IoU - 首先二值化解释)
+        # 3. localization metric (IoU - first binarize explanation)
         threshold = 0.5
         binary_img_explanation = (img_explanation > threshold).astype(int)
         binary_corrupted_explanation = (corrupted_explanation > threshold).astype(int)
@@ -251,34 +251,34 @@ class IGRobustnessTest:
         union = np.logical_or(binary_img_explanation, binary_corrupted_explanation).sum()
         iou = intersection / (union + 1e-8)
         
-        # 4. 预测变化指标 (预测翻转)
+        # 4. prediction change metric (prediction flip)
         prediction_change = int(img_pred != corrupted_pred)
         
-        # 5. 置信度差异
+        # 5. confidence difference
         confidence_diff = np.abs(img_probs[img_pred] - corrupted_probs[corrupted_pred])
         
-        # 6. KL散度
-        # 添加平滑以避免零概率
+        # 6. KL divergence
+        # add smoothing to avoid zero probability
         img_probs_smooth = img_probs + 1e-10
         corrupted_probs_smooth = corrupted_probs + 1e-10
         
-        # 归一化
+        # normalize
         img_probs_smooth = img_probs_smooth / img_probs_smooth.sum()
         corrupted_probs_smooth = corrupted_probs_smooth / corrupted_probs_smooth.sum()
         
         kl_div = np.sum(img_probs_smooth * np.log(img_probs_smooth / corrupted_probs_smooth))
         
-        # 7. Top-5距离
+        # 7. Top-5 distance
         img_top5 = np.argsort(img_probs)[-5:]
         corrupted_top5 = np.argsort(corrupted_probs)[-5:]
         
-        # 计算top5中不同位置的数量
+        # calculate number of different positions in top5
         top5_diff = len(set(img_top5) - set(corrupted_top5))
         
-        # 8. 腐蚀错误率
+        # 8. corruption error rate
         ce = 1.0 if img_pred != corrupted_pred else 0.0
         
-        # 9. 稳定性指标（如果提供了多个解释）
+        # 9. stability metric (if multiple explanations are provided)
         stability = 0.0
         if stability_list and len(stability_list) > 1:
             avg_exp = np.mean(stability_list, axis=0)
@@ -298,28 +298,28 @@ class IGRobustnessTest:
 
     def save_visualization(self, original_img, corrupted_img, original_attr, corrupted_attr, 
                          output_path, corruption_type, severity):
-        """保存解释的可视化图像"""
+        """save explanation visualization"""
         plt.figure(figsize=(10, 5))
         
-        # 显示原始图像
+        # show original image
         plt.subplot(2, 2, 1)
         plt.imshow(np.array(original_img))
         plt.title("Original Image")
         plt.axis('off')
         
-        # 显示原始图像的IG解释
+        # show original image's IG explanation
         plt.subplot(2, 2, 2)
         plt.imshow(original_attr, cmap='jet')
         plt.title("Original IG")
         plt.axis('off')
         
-        # 显示腐蚀后的图像
+        # show corrupted image
         plt.subplot(2, 2, 3)
         plt.imshow(np.array(corrupted_img))
         plt.title(f"{corruption_type} (Severity {severity})")
         plt.axis('off')
         
-        # 显示腐蚀后图像的IG解释
+        # show corrupted image's IG explanation
         plt.subplot(2, 2, 4)
         plt.imshow(corrupted_attr, cmap='jet')
         plt.title("Corrupted IG")
@@ -332,102 +332,102 @@ class IGRobustnessTest:
     def test_robustness(self, image_dir: str, output_file: str, temp_file: str = None, 
                        save_viz: bool = False, viz_dir: str = None, test_mode: bool = False,
                        test_samples: int = 10):
-        """测试IG解释的鲁棒性"""
+        """test robustness of IG explanation"""
         results = {}
         
-        # 如果提供了临时文件且存在，则加载它
+        # if temp file is provided and exists, load it
         if temp_file and os.path.exists(temp_file):
             with open(temp_file, 'r') as f:
                 results = json.load(f)
                 print(f"已加载 {len(results)} 个之前的结果从 {temp_file}")
                 
-        # 获取图像列表
+        # get image list
         image_files = []
         for root, _, files in os.walk(image_dir):
             for file in files:
                 if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                     image_files.append(os.path.join(root, file))
         
-        # 如果是测试模式，则只使用指定数量的样本
+        # if test mode, only use specified number of samples
         if test_mode:
             if len(image_files) > test_samples:
                 image_files = image_files[:test_samples]
             print(f"测试模式：使用 {len(image_files)} 张图片")
                 
-        # 创建可视化目录（如果需要）
+        # create visualization directory (if needed)
         if save_viz and viz_dir:
             os.makedirs(viz_dir, exist_ok=True)
             
         total_images = len(image_files)
         start_time = time.time()
-        total_corruptions = len(self.corruption_types) * 5  # 每种腐蚀5个严重程度级别
+        total_corruptions = len(self.corruption_types) * 5  # 5 severity levels for each corruption type
         
-        print(f"开始处理共 {total_images} 张图片，每张图片将测试 {len(self.corruption_types)} 种腐蚀类型，每种类型5个严重程度")
-        print(f"总计需要处理 {total_images * total_corruptions} 个样本点")
+        print(f"Start processing {total_images} images, each will be tested with {len(self.corruption_types)} corruption types, each with 5 severity levels")
+        print(f"Total {total_images * total_corruptions} samples to process")
         
-        # 处理每个图像
+        # process each image
         for idx, image_path in enumerate(image_files):
             image_start_time = time.time()
             if image_path in results:
-                print(f"跳过已处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
+                print(f"Skipping processed image [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
                 continue
                 
-            print(f"\n处理图片 [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
+            print(f"\nProcessing image [{idx+1}/{total_images}] ({(idx+1)/total_images*100:.1f}%): {os.path.basename(image_path)}")
             try:
-                # 初始化该图像的结果
+                # initialize results for this image
                 results[image_path] = {}
                 
-                # 加载原始图像
+                # load original image
                 input_tensor, original_image = self.load_image(image_path)
                 
-                # 获取模型预测
+                # get model prediction
                 with torch.no_grad():
                     output = self.model(input_tensor)
                     
-                # 获取预测类别和概率
+                # get prediction class and probability
                 probs = torch.nn.functional.softmax(output, dim=1).cpu().numpy()[0]
                 pred_class = torch.argmax(output, dim=1).item()
                 
-                print(f"  原始图片预测类别: {pred_class}")
+                print(f"  Original image prediction class: {pred_class}")
                 
-                # 生成原始图像的IG解释
-                print(f"  生成原始图片的IG解释...")
+                # generate original image's IG explanation
+                print(f"  Generating original image's IG explanation...")
                 original_explanation = self.generate_ig(input_tensor)
                 
-                # 生成多个IG解释用于稳定性计算
-                print(f"  生成多个解释用于稳定性计算...")
+                # generate multiple IG explanations for stability calculation
+                print(f"  Generating multiple explanations for stability calculation...")
                 original_stability_explanations = self.generate_multiple_igs(input_tensor)
                 
-                # 处理每种腐蚀类型
+                # process each corruption type
                 corruption_count = 0
                 for c_idx, corruption_type in enumerate(self.corruption_types):
                     results[image_path][corruption_type] = {"results": []}
-                    print(f"  处理腐蚀类型 [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
+                    print(f"  Processing corruption type [{c_idx+1}/{len(self.corruption_types)}]: {corruption_type}")
                     
-                    # 对每个严重程度级别
+                    # process each severity level
                     for severity in range(1, 6):
                         corruption_count += 1
                         progress = corruption_count / total_corruptions * 100
-                        print(f"    严重程度 {severity}/5 - 当前图片进度: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
+                        print(f"    Severity {severity}/5 - Current image progress: {corruption_count}/{total_corruptions} ({progress:.1f}%)")
                         
-                        # 应用腐蚀
+                        # apply corruption
                         corrupted_image = self.apply_corruption(original_image, corruption_type, severity)
                         corrupted_tensor = self.transform(corrupted_image).unsqueeze(0).to(self.device)
                         
-                        # 获取腐蚀后图像的预测
+                        # get prediction of corrupted image
                         with torch.no_grad():
                             corrupted_output = self.model(corrupted_tensor)
                             
                         corrupted_probs = torch.nn.functional.softmax(corrupted_output, dim=1).cpu().numpy()[0]
                         corrupted_pred_class = torch.argmax(corrupted_output, dim=1).item()
                         
-                        # 生成腐蚀后图像的IG解释
+                        # generate IG explanation of corrupted image
                         corrupted_explanation = self.generate_ig(corrupted_tensor)
                         
-                        # 生成多个IG解释用于稳定性计算
+                        # generate multiple IG explanations for stability calculation
                         corrupted_stability_explanations = self.generate_multiple_igs(corrupted_tensor)
                         
-                        # 计算指标
+                        # compute metrics
                         metrics = self.compute_metrics(
                             original_explanation, 
                             corrupted_explanation,
@@ -438,13 +438,13 @@ class IGRobustnessTest:
                             corrupted_stability_explanations
                         )
                         
-                        # 添加严重程度
+                        # add severity level
                         metrics["severity"] = severity
                         
-                        # 保存到结果
+                        # save to results
                         results[image_path][corruption_type]["results"].append(metrics)
                         
-                        # 保存可视化（如果需要）
+                        # save visualization (if needed)
                         if save_viz and viz_dir:
                             viz_filename = f"{os.path.basename(image_path).split('.')[0]}_{corruption_type}_s{severity}.png"
                             viz_path = os.path.join(viz_dir, viz_filename)
@@ -454,7 +454,7 @@ class IGRobustnessTest:
                                 viz_path, corruption_type, severity
                             )
                 
-                # 每完成一张图像保存一次临时结果
+                # save temporary results after each image
                 if temp_file:
                     with open(temp_file, 'w') as f:
                         json.dump(results, f)
@@ -466,26 +466,26 @@ class IGRobustnessTest:
                 
                 image_time = time.time() - image_start_time
                 
-                print(f"\n图片 [{idx+1}/{total_images}] 处理完成，耗时: {image_time:.2f}秒")
-                print(f"总进度: {idx+1}/{total_images} 图片 ({(idx+1)/total_images*100:.1f}%)")
-                print(f"平均每图片耗时: {avg_time_per_image:.2f}秒")
-                print(f"估计剩余时间: {est_remaining_time/60:.1f}分钟 ({est_remaining_time/3600:.1f}小时)")
+                print(f"\nImage [{idx+1}/{total_images}] processed, time: {image_time:.2f} seconds")
+                print(f"Total progress: {idx+1}/{total_images} images ({(idx+1)/total_images*100:.1f}%)")
+                print(f"Average time per image: {avg_time_per_image:.2f} seconds")
+                print(f"Estimated remaining time: {est_remaining_time/60:.1f} minutes ({est_remaining_time/3600:.1f} hours)")
                     
             except Exception as e:
-                print(f"处理图片 {image_path} 时出错: {str(e)}")
+                print(f"Error processing image {image_path}: {str(e)}")
                 continue
                 
-        # 保存最终结果
+        # save final results
         with open(output_file, 'w') as f:
             json.dump(results, f)
             
         total_time = time.time() - start_time
-        print(f"\n测试完成。结果已保存到 {output_file}")
-        print(f"总耗时: {total_time/60:.1f}分钟 ({total_time/3600:.1f}小时)")
-        print(f"平均每张图片耗时: {total_time/total_images:.1f}秒")
+        print(f"\nTest completed. Results saved to {output_file}")
+        print(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.1f} hours)")
+        print(f"Average time per image: {total_time/total_images:.1f} seconds")
 
 def main():
-    """主函数"""
+    """Main function"""
     parser = argparse.ArgumentParser(description='Test robustness of Integrated Gradients explanations')
     parser.add_argument('--image_dir', type=str, default='experiments/data/tiny-imagenet-200/val',
                         help='Directory containing validation images')
@@ -505,15 +505,15 @@ def main():
     
     args = parser.parse_args()
     
-    # 创建输出目录
+    # create output directory
     os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
     if args.temp_file:
         os.makedirs(os.path.dirname(args.temp_file), exist_ok=True)
     
-    # 创建测试实例
+    # create test instance
     tester = IGRobustnessTest(model_type=args.model_type)
     
-    # 运行测试
+    # run test
     tester.test_robustness(
         image_dir=args.image_dir,
         output_file=args.output_file,

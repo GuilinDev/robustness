@@ -129,7 +129,7 @@ For best performance on a GPU instance:
 
 ## 文件结构
 
-- `test_ig_robustness.py`: 主测试脚本，处理图像并计算指标
+- `test_ig_robustness.py`: Main test script, processing images and calculating metrics
 - `analyze_ig_robustness_results.py`: 结果分析脚本，生成报告和可视化
 - `requirements.txt`: 依赖项列表
 - `run_ig_test.sh`: 运行标准模型完整测试的脚本

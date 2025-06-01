@@ -1,0 +1,48 @@
+
+[notice] A new release of pip is available: 25.0.1 -> 25.1.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+E:/allProjects/robustness/experiments/scripts/ig/run_ig_test.sh: line 19: ldconfig: command not found
+E:/allProjects/robustness/experiments/scripts/ig/run_ig_test.sh: line 21: apt-get: command not found
+
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "E:\allProjects\robustness\experiments\scripts\ig\test_ig_robustness.py", line 1, in <module>
+    import torch
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\torch\__init__.py", line 1477, in <module>
+    from .functional import *  # noqa: F403
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\torch\functional.py", line 9, in <module>
+    import torch.nn.functional as F
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\torch\nn\__init__.py", line 1, in <module>
+    from .modules import *  # noqa: F403
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\torch\nn\modules\__init__.py", line 35, in <module>
+    from .transformer import TransformerEncoder, TransformerDecoder, \
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\torch\nn\modules\transformer.py", line 20, in <module>
+    device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+E:\allProjects\robustness\.venv\Lib\site-packages\torch\nn\modules\transformer.py:20: UserWarning: Failed to initialize NumPy: _ARRAY_API not found (Triggered internally at ..\torch\csrc\utils\tensor_numpy.cpp:84.)
+  device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+Downloading: "https://download.pytorch.org/models/resnet50-0676ba61.pth" to C:\Users\guili/.cache\torch\hub\checkpoints\resnet50-0676ba61.pth
+  0%|          | 0.00/97.8M [00:00<?, ?B/s]  4%|¨…         | 3.88M/97.8M [00:00<00:02, 37.9MB/s]  8%|¨‚         | 7.49M/97.8M [00:00<00:03, 31.1MB/s] 13%|¨€¨†        | 12.8M/97.8M [00:00<00:02, 40.8MB/s] 19%|¨€¨        | 18.7M/97.8M [00:00<00:01, 48.6MB/s] 24%|¨€¨€¨…       | 23.5M/97.8M [00:00<00:01, 48.1MB/s] 29%|¨€¨€¨       | 28.2M/97.8M [00:00<00:02, 35.0MB/s] 33%|¨€¨€¨€¨†      | 32.0M/97.8M [00:01<00:02, 27.1MB/s] 37%|¨€¨€¨€¨ƒ      | 36.0M/97.8M [00:01<00:02, 30.1MB/s] 42%|¨€¨€¨€¨€¨‡     | 40.9M/97.8M [00:01<00:01, 35.0MB/s] 46%|¨€¨€¨€¨€¨„     | 45.0M/97.8M [00:01<00:01, 36.1MB/s] 50%|¨€¨€¨€¨€¨     | 48.8M/97.8M [00:01<00:01, 35.4MB/s] 55%|¨€¨€¨€¨€¨€¨…    | 53.4M/97.8M [00:01<00:01, 38.8MB/s] 60%|¨€¨€¨€¨€¨€¨€    | 59.1M/97.8M [00:01<00:00, 44.3MB/s] 66%|¨€¨€¨€¨€¨€¨€¨ƒ   | 64.8M/97.8M [00:01<00:00, 48.6MB/s] 72%|¨€¨€¨€¨€¨€¨€¨€¨‡  | 70.7M/97.8M [00:01<00:00, 52.3MB/s] 78%|¨€¨€¨€¨€¨€¨€¨€¨‚  | 76.2M/97.8M [00:01<00:00, 54.0MB/s] 84%|¨€¨€¨€¨€¨€¨€¨€¨€¨† | 81.7M/97.8M [00:02<00:00, 54.8MB/s] 90%|¨€¨€¨€¨€¨€¨€¨€¨€¨ | 87.9M/97.8M [00:02<00:00, 57.7MB/s] 96%|¨€¨€¨€¨€¨€¨€¨€¨€¨€¨„| 93.5M/97.8M [00:02<00:00, 55.3MB/s]100%|¨€¨€¨€¨€¨€¨€¨€¨€¨€¨€| 97.8M/97.8M [00:02<00:00, 43.8MB/s]
+Traceback (most recent call last):
+  File "E:\allProjects\robustness\experiments\scripts\ig\analyze_ig_robustness_results.py", line 379, in <module>
+    main() 
+    ^^^^^^
+  File "E:\allProjects\robustness\experiments\scripts\ig\analyze_ig_robustness_results.py", line 376, in main
+    analyzer.run_analysis(args.figures_dir, args.report_path, args.severity_level, args.model_type)
+  File "E:\allProjects\robustness\experiments\scripts\ig\analyze_ig_robustness_results.py", line 337, in run_analysis
+    self.plot_metric_heatmaps(figures_dir, model_type)
+  File "E:\allProjects\robustness\experiments\scripts\ig\analyze_ig_robustness_results.py", line 106, in plot_metric_heatmaps
+    severity_df = df[df['severity'] == severity]
+                     ~~^^^^^^^^^^^^
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\pandas\core\frame.py", line 4102, in __getitem__
+    indexer = self.columns.get_loc(key)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\allProjects\robustness\.venv\Lib\site-packages\pandas\core\indexes\range.py", line 417, in get_loc
+    raise KeyError(key)
+KeyError: 'severity'

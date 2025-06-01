@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Script configuration - Uncomment and modify these options for optimization
-OPTIMIZE=true      # Set to true to enable optimizations
-SAMPLE_SIZE=1000   # Number of images to process (set to 0 for all images)
+OPTIMIZE=false      # Set to true to enable optimizations
+SAMPLE_SIZE=0   # Number of images to process (set to 0 for all images)
 N_STEPS=20         # IG integration steps (original is 50, lower is faster)
 RANDOM_SEED=42     # Fixed random seed for reproducibility
 # End of configuration
@@ -23,11 +23,11 @@ fi
 
 # Create output filenames based on optimization settings
 if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
-  RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
-  TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
-  VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/ig_standard_figures"
-  REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
+  RESULTS_FILE="experiments/scripts/ig/ig_robustness_standard_results.json"
+  TEMP_FILE="experiments/scripts/ig/ig_robustness_standard_temp.json"
+  VIZ_DIR="experiments/scripts/ig/ig_viz_standard"
+  FIGURES_DIR="experiments/scripts/ig/results/ig_standard_figures"
+  REPORT_PATH="experiments/scripts/ig/results/ig_standard_analysis_report.md"
   
   mkdir -p $VIZ_DIR
   mkdir -p $FIGURES_DIR
@@ -68,11 +68,11 @@ if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
   # Use the subset for testing
   IMAGE_DIR=$TEST_DIR
 else
-  RESULTS_FILE="experiments/results/ig_robustness_standard_results.json"
-  TEMP_FILE="experiments/results/ig_robustness_standard_temp.json"
-  VIZ_DIR="experiments/results/ig_viz_standard"
-  FIGURES_DIR="experiments/results/ig_standard_figures"
-  REPORT_PATH="experiments/results/ig_standard_analysis_report.md"
+  RESULTS_FILE="experiments/scripts/ig/ig_robustness_standard_results.json"
+  TEMP_FILE="experiments/scripts/ig/ig_robustness_standard_temp.json"
+  VIZ_DIR="experiments/scripts/ig/ig_viz_standard"
+  FIGURES_DIR="experiments/scripts/ig/results/ig_standard_figures"
+  REPORT_PATH="experiments/scripts/ig/results/ig_standard_analysis_report.md"
   IMAGE_DIR="experiments/data/tiny-imagenet-200/val"
   
   mkdir -p $VIZ_DIR
