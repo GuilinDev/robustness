@@ -15,10 +15,6 @@ mkdir -p experiments/data/samples
 # Install required dependencies
 pip install -r experiments/scripts/ig/requirements.txt
 
-# Install RobustBench library (for robust models)
-echo "Installing RobustBench library..."
-pip install git+https://github.com/RobustBench/robustbench.git
-
 # Ensure OpenCV system dependencies are installed
 if ! ldconfig -p | grep -q libGL.so.1 2>/dev/null; then
   echo "Installing system dependencies for OpenCV..."
@@ -27,11 +23,11 @@ fi
 
 # Create output filenames based on optimization settings
 if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
-  RESULTS_FILE="experiments/scripts/ig/ig_robustness_robust_results.json"
-  TEMP_FILE="experiments/scripts/ig/ig_robustness_robust_temp.json"
-  VIZ_DIR="experiments/scripts/ig/ig_viz_robust"
-  FIGURES_DIR="experiments/scripts/ig/results/ig_robust_figures"
-  REPORT_PATH="experiments/scripts/ig/results/ig_robust_analysis_report.md"
+  RESULTS_FILE="experiments/results/ig_robustness_robust_results.json"
+  TEMP_FILE="experiments/results/ig_robustness_robust_temp.json"
+  VIZ_DIR="experiments/results/ig_viz_robust"
+  FIGURES_DIR="experiments/results/ig_robust_figures"
+  REPORT_PATH="experiments/results/ig_robust_analysis_report.md"
   
   mkdir -p $VIZ_DIR
   mkdir -p $FIGURES_DIR
@@ -71,11 +67,11 @@ if [ "$OPTIMIZE" = true ] && [ $SAMPLE_SIZE -gt 0 ]; then
   # Use the subset for testing
   IMAGE_DIR=$TEST_DIR
 else
-  RESULTS_FILE="experiments/scripts/ig/ig_robustness_robust_results.json"
-  TEMP_FILE="experiments/scripts/ig/ig_robustness_robust_temp.json"
-  VIZ_DIR="experiments/scripts/ig/ig_viz_robust"
-  FIGURES_DIR="experiments/scripts/ig/results/ig_robust_figures"
-  REPORT_PATH="experiments/scripts/ig/results/ig_robust_analysis_report.md"
+  RESULTS_FILE="experiments/results/ig_robustness_robust_results.json"
+  TEMP_FILE="experiments/results/ig_robustness_robust_temp.json"
+  VIZ_DIR="experiments/results/ig_viz_robust"
+  FIGURES_DIR="experiments/results/ig_robust_figures"
+  REPORT_PATH="experiments/results/ig_robust_analysis_report.md"
   IMAGE_DIR="experiments/data/tiny-imagenet-200/val"
   
   mkdir -p $VIZ_DIR
@@ -108,29 +104,12 @@ python $SCRIPT_PATH \
   --save_viz \
   --viz_dir $VIZ_DIR
 
-# Check if the test was successful
-if [ $? -eq 0 ]; then
-  echo "Test completed successfully!"
-  
-  # Analyze results
-  echo "Analyzing results..."
-  python experiments/scripts/ig/analyze_ig_robustness_results.py \
-    --results_path $RESULTS_FILE \
-    --figures_dir $FIGURES_DIR \
-    --report_path $REPORT_PATH \
-    --severity_level 3
-    
-  # Check if the analysis was successful
-  if [ $? -eq 0 ]; then
-    echo "Analysis completed successfully!"
-  else
-    echo "Analysis failed! Please check the error information."
-    exit 1
-  fi
-else
-  echo "Test failed! Please check the error information."
-  exit 1
-fi
+# Analyze results
+python experiments/scripts/ig/analyze_ig_robustness_results.py \
+  --results_path $RESULTS_FILE \
+  --figures_dir $FIGURES_DIR \
+  --report_path $REPORT_PATH \
+  --severity_level 3
 
 # Clean up temporary script if created
 if [ "$OPTIMIZE" = true ] && [ $N_STEPS -gt 0 ]; then
